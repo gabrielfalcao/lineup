@@ -42,7 +42,6 @@ import requests
 class Scraper(Step):
     def consume(self):
         url = instructions['url']
-
         response = requests.get(url)
 
         # pretend you generated a

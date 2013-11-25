@@ -35,7 +35,8 @@ import traceback
 from pprint import pformat
 from redis import StrictRedis
 from threading import RLock, Thread
-
+from lineup.datastructures import Queue
+from lineup.backends.redis import JSONRedisBackend
 
 class KeyMaker(object):
     def __init__(self, step):
@@ -50,39 +51,58 @@ class KeyMaker(object):
 
 
 class Step(Thread):
-    def __init__(self, consume_queue, produce_queue, parent):
-        super(Worker, self).__init__()
+    def __init__(self, consume_queue, produce_queue, parent, backend=JSONRedisBackend):
+        super(Step, self).__init__()
+        self.key = KeyMaker(self)
         self.consume_queue = consume_queue
         self.produce_queue = produce_queue
         self.logger = logging.getLogger(self.key.logging)
         self.daemon = False
         self.parent = parent
-        if hasattr(self.__class__, 'name'):
-            previous_name = name
-        else:
-            previous_name = self.__class__.__name__
-        self.name = ':'.join([parent.name, self.__class__.__module__, previous_name])
+        self.backend = backend()
+        self.name = getattr(self.__class__, 'label', self.taxonomy)
+        consume_queue.adopt_consumer(self)
+        produce_queue.adopt_producer(self)
+
+    def get_name(self):
+        return getattr(self, 'name', None) or self.taxonomy
 
     def __str__(self):
-        return '<{0}>'.format(self.name)
+        return '<{0}>'.format(self.ancestry)
+
+    @property
+    def taxonomy(self):
+        class_name = self.__class__.__name__
+        module_name = self.__class__.__module__
+        return '.'.join([module_name, class_name])
+
+    @property
+    def ancestry(self):
+        return '|'.join([self.get_name(), self.parent.get_name()])
+
+    @property
+    def id(self):
+        return '|'.join([self.parent.id, str(self.ident), self.ancestry])
 
     @property
     def alive(self):
-        return self.redis.get_json(self.key.alive)
+        return self.backend.get(self.key.alive)
 
     def log(self, message, *args, **kw):
         self.logger.info(message, *args, **kw)
-        return self.redis.rpush_json(self.key.logging, {
-            'message': message % args % kwargs,
+        return self.backend.rpush(self.key.logging, {
+            'message': message % args % kw,
             'when': time.time()
         })
 
     def fail(self, exception):
         error = traceback.format_exc(exception)
-        self.logger.exception('The worker %s failed while being processed at the pipeline "%s"', self.name, self.parent.name)
+        message = 'The worker %s failed while being processed at the pipeline "%s"'
+        args = (self.name, self.parent.name)
+        self.logger.exception(message, *args)
         self.parent.enqueue_error(source_class=self.__class__, instructions=instructions, exception=exception)
-        return self.redis.rpush_json(self.key.logging, {
-            'message': message % args % kwargs,
+        return self.backend.rpush(self.key.logging, {
+            'message': message % args,
             'when': time.time()
         })
 
@@ -93,7 +113,7 @@ class Step(Thread):
         return self.produce_queue.put(payload)
 
     def before_consume(self):
-        self.log("%s is about to consume its queue", self, with_redis=False)
+        self.log("%s is about to consume its queue", self)
 
     def after_consume(self, instructions):
         self.log("%s is done", self)
@@ -105,7 +125,7 @@ class Step(Thread):
             self.fail(e, instructions)
 
     def run(self):
-        self.redis.set_json(self.key.alive, True)
+        self.backend.set(self.key.alive, True)
 
         while self.alive:
             self.before_consume()

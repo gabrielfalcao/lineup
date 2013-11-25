@@ -1,12 +1,36 @@
+# <variables>
+PACKAGE=lineup  # the python module name
+TESTS_VERBOSITY=2
+export PYTHONPATH=$(pwd)
+# </variables>
+
+EXTRA_TEST_TASKS=
 all: test
 
 filename=lineup-`python -c 'import lineup.version;print lineup.version.version'`.tar.gz
 
 export PYTHONPATH:=  ${PWD}
 
-test: clean
-	@echo "Running tests"
-	@nosetests --cover-branches --with-coverage  --cover-erase --cover-package=lineup --stop -v -s tests
+run_test:
+	@if [ -d tests/$(suite) ]; then \
+		if [ "`ls tests/$(suite)/*.py`" = "tests/$(suite)/__init__.py" ] ; then \
+			echo "No \033[0;32m$(suite)\033[0m tests..."; \
+		else \
+			echo "======================================="; \
+			echo "* Running \033[0;32m$(suite)\033[0m test suite *"; \
+			echo "======================================="; \
+			nosetests --rednose --stop --with-coverage --cover-package=$(PACKAGE) \
+				--cover-branches  --cover-erase --verbosity=$(TESTS_VERBOSITY) -s tests/$(suite) ; \
+		fi \
+	fi
+
+unit:
+	@make run_test suite=unit
+
+functional:
+	@make run_test suite=functional
+
+acceptance:
 	@steadymark README.md
 	@steadymark docs/*.md
 
