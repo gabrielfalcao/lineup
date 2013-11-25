@@ -129,3 +129,5 @@ curd install -r development.txt
 ```bash
 make test
 ```
+
+[![instanc.es Badge](https://instanc.es/bin/gabrielfalcao/lineup.png)](http://instanc.es)
