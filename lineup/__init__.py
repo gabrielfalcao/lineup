@@ -29,12 +29,13 @@ from __future__ import unicode_literals
 import sys
 import time
 import json
+import signal
 import logging
 import traceback
 
 from pprint import pformat
 from redis import StrictRedis
-from threading import RLock, Thread
+from threading import Thread, Event
 from lineup.datastructures import Queue
 from lineup.backends.redis import JSONRedisBackend
 
@@ -57,10 +58,13 @@ class Step(Thread):
         self.consume_queue = consume_queue
         self.produce_queue = produce_queue
         self.logger = logging.getLogger(self.key.logging)
-        self.daemon = False
+        self.daemon = True
         self.parent = parent
         self.backend = backend()
         self.name = getattr(self.__class__, 'label', self.taxonomy)
+        self.ready = Event()
+        self.ready.clear()
+
         consume_queue.adopt_consumer(self)
         produce_queue.adopt_producer(self)
 
@@ -83,10 +87,6 @@ class Step(Thread):
     @property
     def id(self):
         return '|'.join([self.parent.id, str(self.ident), self.ancestry])
-
-    @property
-    def alive(self):
-        return self.backend.get(self.key.alive)
 
     def log(self, message, *args, **kw):
         self.logger.info(message, *args, **kw)
@@ -124,14 +124,41 @@ class Step(Thread):
         except Exception as e:
             self.fail(e, instructions)
 
+    def validate_signals(self):
+        handler = signal.getsignal(signal.SIGINT)
+        if callable(handler) and handler.__module__ == 'signal':
+            print "The main thread did not handle sigint"
+            raise SystemExit
+
+    def stop(self):
+        return self.ready.set()
+
+    def is_active(self):
+        is_locked = self.ready.is_set()
+        timeout = self.parent.timeout
+
+        if timeout < 0:
+            timeout = None
+
+        if is_locked:
+            self.ready.wait(timeout)
+
+        return not is_locked
+
     def run(self):
+        self.validate_signals()
         self.backend.set(self.key.alive, True)
 
-        while self.alive:
+        while self.is_active():
             self.before_consume()
             instructions = self.consume_queue.get()
             if not instructions:
-                sys.exit(1)
+                self.ready.clear()
+                continue
+
+            if instructions:
+                self.ready.set()
+
             try:
                 self.consume(instructions)
             except Exception as e:
@@ -144,5 +171,7 @@ class Step(Thread):
                 self.produce(instructions)
                 self.do_rollback(instructions)
                 continue
+            finally:
+                self.ready.clear()
 
             self.after_consume(instructions)

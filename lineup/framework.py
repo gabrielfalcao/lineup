@@ -3,13 +3,23 @@
 from __future__ import unicode_literals
 import os
 import socket
+import signal
 import traceback
 from lineup.datastructures import Queue
 
 
 class Node(object):
     def __init__(self, *args, **kw):
+        self.children = []
+        signal.signal(signal.SIGINT, self.handle_control_c)
+
         self.initialize(*args, **kw)
+
+    def handle_control_c(self, signal, frame):
+        for child in self.workers:
+            child.stop()
+
+        raise SystemExit
 
     def initialize(self, *args, **kw):
         pass
@@ -59,9 +69,11 @@ class Node(object):
 
 
 class Pipeline(Node):
-    def initialize(self):
-        self.queues = self.get_queues(*args, **kw)
-        self.workers = [self.make_worker(Worker, index) for index, Worker in enumerate(steps)]
+    timeout = -1
+
+    def initialize(self, *args, **kwargs):
+        self.queues = self.get_queues(*args, **kwargs)
+        self.workers = [self.make_worker(Worker, index) for index, Worker in enumerate(self.steps)]
 
     @property
     def input(self):
@@ -71,9 +83,26 @@ class Pipeline(Node):
     def output(self):
         return self.queues[-1]
 
+    def feed(self, instructions):
+        return self.input.put(instructions)
+
+    def get_result(self):
+        return self.output.get()
+
+    def make_queue(self, index):
+        name = '.'.join([
+            self.__class__.__module__,
+            self.__class__.__name__,
+            b'queue',
+            str(index),
+        ])
+        return Queue(name, timeout=self.timeout)
+
     def get_queues(self):
         steps = getattr(self, 'steps', None) or []
-        return [Queue() for _ in steps] + [Queue()]
+        indexes = xrange(len(steps) + 1)
+        queues = map(self.make_queue, indexes)
+        return queues
 
     def make_worker(self, Worker, index):
-        return Worker(self, self.queues[index], self.queues[index + 1])
+        return Worker(self.queues[index], self.queues[index + 1], self)

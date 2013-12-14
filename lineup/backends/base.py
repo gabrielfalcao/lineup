@@ -26,11 +26,16 @@
 
 from __future__ import unicode_literals
 from functools import wraps
+from threading import RLock
 
 
 class BaseBackend(object):
-    pass
+    def __init__(self, *args, **kwargs):
+        self.lock = RLock()
+        self.initialize(*args, **kwargs)
 
+    def initialize(self, *args, **kwargs):
+        """to be overwriten by subclasses"""
 
 def io_operation(method):
     """decorator for methods of a backend, allowing the redis

@@ -29,13 +29,11 @@ import sys
 import json
 
 from lineup.backends.base import BaseBackend, io_operation
-from threading import RLock
 from redis import StrictRedis
 
 
 class JSONRedisBackend(BaseBackend):
-    def __init__(self):
-        self.lock = RLock()
+    def initialize(self):
         self.redis = StrictRedis()
 
     def serialize(self, value):
@@ -74,6 +72,10 @@ class JSONRedisBackend(BaseBackend):
     @io_operation
     def llen(self, key):
         return self.redis.llen(key)
+
+    @io_operation
+    def lrange(self, key, *args):
+        return self.redis.lrange(key, *args)
 
     @io_operation
     def rpop(self, key):

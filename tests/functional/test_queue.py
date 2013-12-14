@@ -4,8 +4,8 @@ from __future__ import unicode_literals
 import os
 import socket
 from lineup import Step, Queue
-from lineup.framework import Node
-from redis import StrictRedis
+from lineup.framework import Pipeline
+from .base import redis_test
 
 
 class DummyStep(Step):
@@ -13,7 +13,8 @@ class DummyStep(Step):
         self.produce({'cool': instructions})
 
 
-def test_queue_adopt_producer_step():
+@redis_test
+def test_queue_adopt_producer_step(context):
     ("Queue#adopt_producer should take a step and know about its id and")
 
     # Given a dummy manager
@@ -36,26 +37,28 @@ def test_queue_adopt_producer_step():
     tid = step.ident
     value = '{hostname}|{pid}|{tid}|tests.functional.test_queue.DummyStep|lineup.framework.Node'.format(**locals())
 
-    redis = StrictRedis()
-    members = redis.smembers('lineup:test-queue:producers')
+    members = context.redis.smembers('lineup:test-queue:producers')
     members.should.contain(value)
     queue.deactivate()
     q1.deactivate()
     q2.deactivate()
 
-def test_put_waits_to_consume():
-    ("Queue#put should wait until someone consumes")
-    # Given a dummy manager
-    manager = Node()
 
-    consume = Queue('consume')
-    produce = Queue('produce')
+@redis_test
+def test_put_waits_to_consume(context):
+    ("Queue#put should wait until someone consumes and returns the previous queue size and the current queue size")
 
-    step = DummyStep(consume, produce, manager)
-    step.start()
+    class CoolStep(Step):
+        def consume(self, instructions):
+            self.produce({'cool': instructions})
 
+    class CoolFooBar(Pipeline):
+        steps = [CoolStep]
 
-    consume.put({'foo': 'Bar'})
-    produce.get().should.equal({'cool': {'foo': 'Bar'}})
-    consume.deactivate()
-    produce.deactivate()
+    manager = CoolFooBar()
+    manager.start()
+
+    previous, current = manager.feed({'foo': 'Bar'})
+    manager.get_result().should.equal({'cool': {'foo': 'Bar'}})
+    previous.should.equal(0)
+    current.should.equal(1)

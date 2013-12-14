@@ -25,20 +25,40 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals
+
 import time
+from functools import wraps
 from lineup.backends.redis import JSONRedisBackend
+from threading import RLock
 
 DEFAULT_BACKEND = JSONRedisBackend
 
 
+def io_operation(method):
+    """decorator for methods of a queue, allowing the redis
+    operations to run in a lock per thread.
+    """
+    @wraps(method)
+    def decorator(queue, *args, **kwargs):
+        queue.lock.acquire()
+        result = method(queue, *args, **kwargs)
+        queue.lock.release()
+        return result
+
+    return decorator
+
+
 class Queue(object):
     prefix = 'lineup'
-    def __init__(self, name, maxsize=None, backend=DEFAULT_BACKEND):
+    def __init__(self, name, maxsize=None, backend=DEFAULT_BACKEND, timeout=-1):
         self.name = ':'.join([self.prefix, name])
         self.maxsize = maxsize
+        self.timeout = timeout
         self.backend = backend()
         self.producers = set()
         self.consumers = set()
+        self.lock = RLock()
+
 
     def adopt_producer(self, producer):
         self.producers.add(producer.id)
@@ -51,36 +71,33 @@ class Queue(object):
         self.consumers.add(consumer.id)
         return self.report()
 
-    def get_active_key(self):
-        return '@'.join([self.name, 'active'])
-
-    def active(self):
-        key = self.get_active_key()
-        time.sleep(0)
-        return self.backend.get(key)
-
-    def activate(self):
-        key = self.get_active_key()
-        return self.backend.set(key, True)
-
     def deactivate(self):
         key = self.get_active_key()
         return self.backend.set(key, False)
 
-    def put(self, payload, wait=lambda name, total, current: total < current):
-        self.activate()
-        total = self.backend.llen(self.name)
+    @io_operation
+    def put(self, payload):
+        previous = self.backend.llen(self.name)
         self.backend.rpush(self.name, payload)
-
         current = self.backend.llen(self.name)
-        while self.active() and total <= current:
-            current = self.backend.llen(self.name)
-            if not wait(self.name, total, current):
-                return
+        return previous, current
 
+    @io_operation
     def get(self):
-        result = None
-        while self.active() and not result:
-            result = self.backend.lpop(self.name)
+        started = time.time()
+        done = None
+        def wait():
+            delta = time.time() - started
+            if delta < self.timeout:
+                return intern(b"stop")
+            if done is not None:
+                return intern(b"stop")
 
-        return result
+            return delta
+
+        loop = iter(wait, intern(b"stop"))
+
+        for delta in loop:
+            done = self.backend.lpop(self.name)
+            if done:
+                return done
