@@ -52,19 +52,23 @@ class KeyMaker(object):
 
 
 class Step(Thread):
-    def __init__(self, consume_queue, produce_queue, parent, backend=JSONRedisBackend):
-        super(Step, self).__init__()
-        self.key = KeyMaker(self)
+    def __init__(self, consume_queue, produce_queue, parent,
+                 backend=JSONRedisBackend):
+
+        self.parent = parent
         self.consume_queue = consume_queue
         self.produce_queue = produce_queue
-        self.logger = logging.getLogger(self.key.logging)
-        self.daemon = True
-        self.parent = parent
+
         self.backend = backend()
-        self.name = getattr(self.__class__, 'label', self.taxonomy)
         self.ready = Event()
         self.ready.clear()
 
+        super(Step, self).__init__()
+        self.daemon = True
+        self.key = KeyMaker(self)
+        self.name = getattr(self.__class__,
+                            'label', self.taxonomy)
+        self.logger = logging.getLogger(self.key.logging)
         consume_queue.adopt_consumer(self)
         produce_queue.adopt_producer(self)
 
@@ -124,12 +128,6 @@ class Step(Thread):
         except Exception as e:
             self.fail(e, instructions)
 
-    def validate_signals(self):
-        handler = signal.getsignal(signal.SIGINT)
-        if callable(handler) and handler.__module__ == 'signal':
-            print "The main thread did not handle sigint"
-            raise SystemExit
-
     def stop(self):
         return self.ready.set()
 
@@ -140,24 +138,19 @@ class Step(Thread):
         if timeout < 0:
             timeout = None
 
-        if is_locked:
-            self.ready.wait(timeout)
+        # if is_locked:
+        #     self.ready.wait(timeout)
 
         return not is_locked
 
     def run(self):
-        self.validate_signals()
-        self.backend.set(self.key.alive, True)
-
         while self.is_active():
             self.before_consume()
-            instructions = self.consume_queue.get()
-            if not instructions:
-                self.ready.clear()
-                continue
 
-            if instructions:
-                self.ready.set()
+            instructions = self.consume_queue.get()
+
+            if not instructions:
+                continue
 
             try:
                 self.consume(instructions)

@@ -34,6 +34,12 @@ class BaseBackend(object):
         self.lock = RLock()
         self.initialize(*args, **kwargs)
 
+    def get_name(self):
+        return self.__class__.__name__
+
+    def __repr__(self):
+        return '<{0}>'.format(self.get_name())
+
     def initialize(self, *args, **kwargs):
         """to be overwriten by subclasses"""
 

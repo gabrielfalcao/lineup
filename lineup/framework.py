@@ -12,7 +12,7 @@ class Node(object):
     def __init__(self, *args, **kw):
         self.children = []
         signal.signal(signal.SIGINT, self.handle_control_c)
-
+        self.__started = False
         self.initialize(*args, **kw)
 
     def handle_control_c(self, signal, frame):
@@ -43,12 +43,19 @@ class Node(object):
     def make_worker(self, Worker, index):
         return Worker(self, self.input, self.output)
 
-    def start(self):
+    def _start(self):
+        if self.__started:
+            return
+
         for worker in self.workers:
             worker.start()
 
+        self.__started = True
+
     def feed(self, item):
-        self.input.put(item)
+        result = self.input.put(item)
+        self._start()
+        return result
 
     def enqueue_error(self, source_class, instructions, exception):
         print exception, source_class, instructions
@@ -82,9 +89,6 @@ class Pipeline(Node):
     @property
     def output(self):
         return self.queues[-1]
-
-    def feed(self, instructions):
-        return self.input.put(instructions)
 
     def get_result(self):
         return self.output.get()

@@ -59,6 +59,9 @@ class Queue(object):
         self.consumers = set()
         self.lock = RLock()
 
+    def __repr__(self):
+        return b'<lineup.Queue({0}, backend={1})>'.format(
+            self.name, self.backend)
 
     def adopt_producer(self, producer):
         self.producers.add(producer.id)
@@ -70,10 +73,6 @@ class Queue(object):
     def adopt_consumer(self, consumer):
         self.consumers.add(consumer.id)
         return self.report()
-
-    def deactivate(self):
-        key = self.get_active_key()
-        return self.backend.set(key, False)
 
     @io_operation
     def put(self, payload):
@@ -88,7 +87,7 @@ class Queue(object):
         done = None
         def wait():
             delta = time.time() - started
-            if delta < self.timeout:
+            if delta > self.timeout:
                 return intern(b"stop")
             if done is not None:
                 return intern(b"stop")

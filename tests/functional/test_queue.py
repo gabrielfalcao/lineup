@@ -53,11 +53,10 @@ def test_put_waits_to_consume(context):
             self.produce({'cool': instructions})
 
     class CoolFooBar(Pipeline):
+        timeout = 1
         steps = [CoolStep]
 
     manager = CoolFooBar()
-    manager.start()
-
     previous, current = manager.feed({'foo': 'Bar'})
     manager.get_result().should.equal({'cool': {'foo': 'Bar'}})
     previous.should.equal(0)
