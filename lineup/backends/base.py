@@ -25,6 +25,22 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals
+from functools import wraps
+
 
 class BaseBackend(object):
     pass
+
+
+def io_operation(method):
+    """decorator for methods of a backend, allowing the redis
+    operations to run in a lock per thread.
+    """
+    @wraps(method)
+    def decorator(backend, *args, **kwargs):
+        backend.lock.acquire()
+        result = method(backend, *args, **kwargs)
+        backend.lock.release()
+        return result
+
+    return decorator
