@@ -49,12 +49,19 @@ def test_put_waits_to_consume(context):
         def consume(self, instructions):
             self.produce({'cool': instructions})
 
+    class SaveStep(Step):
+
+        def consume(self, instructions):
+            context.redis.set("WORKED", "YES")
+            self.produce({"SAVED": instructions})
+
     class CoolFooBar(Pipeline):
-        steps = [CoolStep]
+        steps = [CoolStep, SaveStep]
 
     manager = CoolFooBar()
     previous, current = manager.feed({'foo': 'Bar'})
-    manager.get_result().should.equal({'cool': {'foo': 'Bar'}})
+    manager.get_result().should.equal({"SAVED": {'cool': {'foo': 'Bar'}}})
 
     previous.should.equal(0)
     current.should.equal(1)
+    context.redis.get("WORKED").should.equal("YES")
