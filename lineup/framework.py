@@ -3,12 +3,14 @@
 from __future__ import unicode_literals
 import os
 import socket
+import time
 import signal
 import traceback
 from lineup.datastructures import Queue
 
 
 class Node(object):
+    timeout = -1
     def __init__(self, *args, **kw):
         self.children = []
         signal.signal(signal.SIGINT, self.handle_control_c)
@@ -53,8 +55,11 @@ class Node(object):
         self.__started = True
 
     def feed(self, item):
-        result = self.input.put(item)
         self._start()
+        while not self.running:
+            time.sleep(0)
+
+        result = self.input.put(item, wait=False)
         return result
 
     def enqueue_error(self, source_class, instructions, exception):
@@ -63,9 +68,13 @@ class Node(object):
     def wait_and_get_work(self):
         return self.output.get()
 
+    def stop(self):
+        for child in self.workers:
+            child.stop()
+
     @property
     def running(self):
-        return all([w.alive for w in self.workers])
+        return all([w.is_alive() for w in self.workers])
 
     def are_running(self):
         if self.running:
@@ -91,7 +100,7 @@ class Pipeline(Node):
         return self.queues[-1]
 
     def get_result(self):
-        return self.output.get()
+        return self.output.get(wait=True)
 
     def make_queue(self, index):
         name = '.'.join([

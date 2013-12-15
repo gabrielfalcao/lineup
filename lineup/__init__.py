@@ -32,10 +32,9 @@ import json
 import signal
 import logging
 import traceback
-
 from pprint import pformat
 from redis import StrictRedis
-from threading import Thread, Event
+from threading import Thread, Event, RLock
 from lineup.datastructures import Queue
 from lineup.backends.redis import JSONRedisBackend
 
@@ -51,6 +50,7 @@ class KeyMaker(object):
         return ":".join([prefix, self.step.name, suffix])
 
 
+
 class Step(Thread):
     def __init__(self, consume_queue, produce_queue, parent,
                  backend=JSONRedisBackend):
@@ -58,7 +58,7 @@ class Step(Thread):
         self.parent = parent
         self.consume_queue = consume_queue
         self.produce_queue = produce_queue
-
+        self.lock = RLock()
         self.backend = backend()
         self.ready = Event()
         self.ready.clear()
@@ -110,11 +110,11 @@ class Step(Thread):
             'when': time.time()
         })
 
-    def consume(self, instructions):
-        raise NotImplemented("You must implement the consume method by yourself")
+    def do_consume(self, instructions):
+        return self.consume(instructions)
 
     def produce(self, payload):
-        return self.produce_queue.put(payload)
+        return self.produce_queue.put(payload, wait=False)
 
     def before_consume(self):
         self.log("%s is about to consume its queue", self)
@@ -138,8 +138,8 @@ class Step(Thread):
         if timeout < 0:
             timeout = None
 
-        # if is_locked:
-        #     self.ready.wait(timeout)
+        if is_locked:
+            self.ready.wait(timeout)
 
         return not is_locked
 
@@ -147,13 +147,13 @@ class Step(Thread):
         while self.is_active():
             self.before_consume()
 
-            instructions = self.consume_queue.get()
+            instructions = self.consume_queue.get(wait=True)
 
             if not instructions:
                 continue
 
             try:
-                self.consume(instructions)
+                self.do_consume(instructions)
             except Exception as e:
                 error = traceback.format_exc(e)
                 self.log(error)

@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import os
 import socket
 from lineup import Step, Queue
-from lineup.framework import Pipeline
+from lineup.framework import Pipeline, Node
 from .base import redis_test
 
 
@@ -39,9 +39,6 @@ def test_queue_adopt_producer_step(context):
 
     members = context.redis.smembers('lineup:test-queue:producers')
     members.should.contain(value)
-    queue.deactivate()
-    q1.deactivate()
-    q2.deactivate()
 
 
 @redis_test
@@ -53,11 +50,11 @@ def test_put_waits_to_consume(context):
             self.produce({'cool': instructions})
 
     class CoolFooBar(Pipeline):
-        timeout = 1
         steps = [CoolStep]
 
     manager = CoolFooBar()
     previous, current = manager.feed({'foo': 'Bar'})
     manager.get_result().should.equal({'cool': {'foo': 'Bar'}})
+
     previous.should.equal(0)
     current.should.equal(1)

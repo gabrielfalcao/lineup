@@ -28,7 +28,8 @@ from __future__ import unicode_literals, absolute_import
 import sys
 import json
 
-from lineup.backends.base import BaseBackend, io_operation
+from lineup.backends.base import BaseBackend
+from lineup.core import io_operation
 from redis import StrictRedis
 
 

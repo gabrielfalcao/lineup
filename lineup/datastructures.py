@@ -27,25 +27,11 @@
 from __future__ import unicode_literals
 
 import time
-from functools import wraps
 from lineup.backends.redis import JSONRedisBackend
 from threading import RLock
 
 DEFAULT_BACKEND = JSONRedisBackend
 
-
-def io_operation(method):
-    """decorator for methods of a queue, allowing the redis
-    operations to run in a lock per thread.
-    """
-    @wraps(method)
-    def decorator(queue, *args, **kwargs):
-        queue.lock.acquire()
-        result = method(queue, *args, **kwargs)
-        queue.lock.release()
-        return result
-
-    return decorator
 
 
 class Queue(object):
@@ -74,29 +60,20 @@ class Queue(object):
         self.consumers.add(consumer.id)
         return self.report()
 
-    @io_operation
-    def put(self, payload):
+    def put(self, payload, wait=True):
         previous = self.backend.llen(self.name)
         self.backend.rpush(self.name, payload)
+
         current = self.backend.llen(self.name)
+
+        while wait and current == (previous + 1):
+            current = self.backend.llen(self.name)
+
         return previous, current
 
-    @io_operation
-    def get(self):
-        started = time.time()
-        done = None
-        def wait():
-            delta = time.time() - started
-            if delta > self.timeout:
-                return intern(b"stop")
-            if done is not None:
-                return intern(b"stop")
-
-            return delta
-
-        loop = iter(wait, intern(b"stop"))
-
-        for delta in loop:
+    def get(self, wait=False):
+        done = self.backend.lpop(self.name)
+        while wait and done is None:
             done = self.backend.lpop(self.name)
-            if done:
-                return done
+
+        return done
