@@ -6,7 +6,18 @@ python:
 services:
   - redis-server
 
-install:
-  - pip install -r requirements.txt
+env:
+  - TEST_TYPE=unit
+  - TEST_TYPE=functional
 
-script: make test
+cache:
+  apt: true
+  directories:
+    - $HOME/.curds
+
+install:
+  - pip install curdling
+  - curd install -r requirements.txt
+
+script:
+  - make $TEST_TYPE
