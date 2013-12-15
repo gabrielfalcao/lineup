@@ -11,7 +11,7 @@ from .base import redis_test
 
 class DummyStep(Step):
     def consume(self, instructions):
-        self.produce({'cool': instructions})
+        self.produce({'yay': instructions})
 
 
 @redis_test
@@ -27,7 +27,6 @@ def test_queue_adopt_producer_step(context):
     q2 = Queue('name2', backend_class=JSONRedisBackend)
     # And a running step (so it gains a thread id)
     step = DummyStep(q1, q2, manager)
-    step.start()
 
     # When that queue adopts the step as a producer
     consumers, producers = queue.adopt_producer(step)
@@ -46,9 +45,9 @@ def test_queue_adopt_producer_step(context):
 def test_pipeline(context):
     ("Pipeline should process steps")
 
-    class CoolStep(Step):
+    class OkStep(Step):
         def consume(self, instructions):
-            self.produce({'cool': instructions})
+            self.produce({'ok': instructions})
 
     class SaveStep(Step):
 
@@ -56,16 +55,16 @@ def test_pipeline(context):
             context.redis.set("WORKED", "YES")
             self.produce({"SAVED": instructions})
 
-    class CoolFooBar(Pipeline):
-        steps = [CoolStep, SaveStep]
+    class OkFooBar(Pipeline):
+        steps = [OkStep, SaveStep]
 
-    manager = CoolFooBar(JSONRedisBackend)
+    manager = OkFooBar(JSONRedisBackend)
     manager.feed({'foo': 'Bar'})
 
     result= manager.get_result()
     manager.stop()
 
-    result.should.equal({"SAVED": {'cool': {'foo': 'Bar'}}})
+    result.should.equal({"SAVED": {'ok': {'foo': 'Bar'}}})
     context.redis.get("WORKED").should.equal("YES")
 
 
