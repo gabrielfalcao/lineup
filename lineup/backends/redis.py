@@ -28,8 +28,8 @@ from __future__ import unicode_literals, absolute_import
 import sys
 import json
 
-from lineup.backends.base import BaseBackend
-from lineup.core import io_operation
+from lineup.backends.base import BaseBackend, io_operation
+
 from redis import StrictRedis
 
 
@@ -46,12 +46,34 @@ class JSONRedisBackend(BaseBackend):
     def deserialize(self, value):
         return value and json.loads(value) or None
 
+    # read operations
     @io_operation
     def get(self, key):
         value = self.redis.get(key)
         result = self.deserialize(value)
         return result
 
+    @io_operation
+    def lpop(self, key):
+        value = self.redis.lpop(key)
+        result = self.deserialize(value)
+        return result
+
+    @io_operation
+    def llen(self, key):
+        return self.redis.llen(key)
+
+    @io_operation
+    def lrange(self, key, start, stop):
+        return self.redis.lrange(key, start,stop)
+
+    @io_operation
+    def rpop(self, key):
+        value = self.redis.rpop(key)
+        result = self.deserialize(value)
+        return result
+
+    # Write operations
     @io_operation
     def set(self, key, value):
         product = self.serialize(value)
@@ -67,26 +89,7 @@ class JSONRedisBackend(BaseBackend):
         product = self.serialize(value)
         return self.redis.lpush(key, product)
 
-    @io_operation
-    def lpop(self, key):
-        value = self.redis.lpop(key)
-        result = self.deserialize(value)
-        return result
-
-    @io_operation
-    def llen(self, key):
-        return self.redis.llen(key)
-
-    @io_operation
-    def lrange(self, key, *args):
-        return self.redis.lrange(key, *args)
-
-    @io_operation
-    def rpop(self, key):
-        value = self.redis.rpop(key)
-        result = self.deserialize(value)
-        return result
-
+    # Pipeline operations
     @io_operation
     def report_steps(self, name, consumers, producers):
         pipeline = self.redis.pipeline()

@@ -26,6 +26,8 @@
 
 from __future__ import unicode_literals
 
+import time
+from functools import wraps
 from threading import RLock
 
 
@@ -42,3 +44,18 @@ class BaseBackend(object):
 
     def initialize(self, *args, **kwargs):
         """to be overwriten by subclasses"""
+
+
+def io_operation(method):
+    """decorator for methods of a backend, allowing the redis
+    operations to run in a lock per thread.
+    """
+    @wraps(method)
+    def decorator(backend, *args, **kwargs):
+        backend.lock.acquire()
+        result = method(backend, *args, **kwargs)
+        time.sleep(0)
+        backend.lock.release()
+        return result
+
+    return decorator

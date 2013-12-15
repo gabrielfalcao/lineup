@@ -7,15 +7,20 @@ import time
 import signal
 import traceback
 from lineup.datastructures import Queue
+from lineup.backends.redis import JSONRedisBackend
 
 
 class Node(object):
     timeout = -1
-    def __init__(self, *args, **kw):
+    def __init__(self, backend_class=JSONRedisBackend, *args, **kw):
         self.children = []
+        self.backend_class = backend_class
         signal.signal(signal.SIGINT, self.handle_control_c)
         self.__started = False
         self.initialize(*args, **kw)
+
+    def get_backend(self, *args, **kwargs):
+        return self.backend_class(*args, **kwargs)
 
     def handle_control_c(self, signal, frame):
         for child in self.workers:
@@ -41,9 +46,6 @@ class Node(object):
 
     def get_hostname(self):
         return socket.gethostname()
-
-    def make_worker(self, Worker, index):
-        return Worker(self, self.input, self.output)
 
     def _start(self):
         if self.__started:
