@@ -28,22 +28,17 @@ from __future__ import unicode_literals
 
 import time
 from lineup.backends.redis import JSONRedisBackend
-from threading import RLock
-
-DEFAULT_BACKEND = JSONRedisBackend
-
 
 
 class Queue(object):
     prefix = 'lineup'
-    def __init__(self, name, maxsize=None, backend=DEFAULT_BACKEND, timeout=-1):
+    def __init__(self, name, backend_class, maxsize=None, timeout=-1):
         self.name = ':'.join([self.prefix, name])
         self.maxsize = maxsize
         self.timeout = timeout
-        self.backend = backend()
+        self.backend = backend_class()
         self.producers = set()
         self.consumers = set()
-        self.lock = RLock()
 
     def __repr__(self):
         return b'<lineup.Queue({0}, backend={1})>'.format(
@@ -54,22 +49,15 @@ class Queue(object):
         return self.report()
 
     def report(self):
-        return self.backend.report_steps(self.name, self.consumers, self.producers)
+        return self.backend.report_steps(
+            self.name, self.consumers, self.producers)
 
     def adopt_consumer(self, consumer):
         self.consumers.add(consumer.id)
         return self.report()
 
-    def put(self, payload, wait=True):
-        previous = self.backend.llen(self.name)
+    def put(self, payload):
         self.backend.rpush(self.name, payload)
-
-        current = self.backend.llen(self.name)
-
-        while wait and current == (previous + 1):
-            current = self.backend.llen(self.name)
-
-        return previous, current
 
     def get(self, wait=False):
         done = self.backend.lpop(self.name)
@@ -77,3 +65,6 @@ class Queue(object):
             done = self.backend.lpop(self.name)
 
         return done
+
+    def get_size(self):
+        return self.backend.llen(self.name)

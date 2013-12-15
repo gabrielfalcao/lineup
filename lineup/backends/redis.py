@@ -65,7 +65,7 @@ class JSONRedisBackend(BaseBackend):
 
     @io_operation
     def lrange(self, key, start, stop):
-        return self.redis.lrange(key, start,stop)
+        return map(self.deserialize, self.redis.lrange(key, start,stop))
 
     @io_operation
     def rpop(self, key):

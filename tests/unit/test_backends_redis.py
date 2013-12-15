@@ -163,13 +163,13 @@ def test_lrange():
 
     # Given an instance of a backend that mocks redis.lrange
     backend = IsolatedTestBackend()
-    backend.redis.lrange.return_value = 1000
+    backend.redis.lrange.return_value = ["v1", "v2"]
 
     # When I call get()
     result = backend.lrange("some-key", 0, -1)
 
     # Then it should return the value straight from redis
-    result.should.equal(1000)
+    result.should.equal([{"deserialized": "v1"}, {"deserialized": "v2"}])
 
     # And redis.lrange should have been called with the key
     backend.redis.lrange.assert_called_once_with("some-key", 0, -1)

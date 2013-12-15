@@ -75,10 +75,10 @@ class Step(Thread):
             'when': time.time()
         })
 
-    def fail(self, exception):
+    def fail(self, exception, instructions):
         error = traceback.format_exc(exception)
         message = 'The worker %s failed while being processed at the pipeline "%s"'
-        args = (self.name, self.parent.name)
+        args = (self.name, self.parent.get_name())
         self.logger.exception(message, *args)
         self.parent.enqueue_error(source_class=self.__class__, instructions=instructions, exception=exception)
         return self.backend.rpush(self.key.logging, {
@@ -90,7 +90,7 @@ class Step(Thread):
         return self.consume(instructions)
 
     def produce(self, payload):
-        return self.produce_queue.put(payload, wait=False)
+        return self.produce_queue.put(payload)
 
     def before_consume(self):
         self.log("%s is about to consume its queue", self)
@@ -103,6 +103,9 @@ class Step(Thread):
             self.rollback(instructions)
         except Exception as e:
             self.fail(e, instructions)
+
+    def rollback(self, instructions):
+        pass
 
     def stop(self):
         return self.ready.set()
@@ -134,8 +137,11 @@ class Step(Thread):
                 error = traceback.format_exc(e)
                 self.log(error)
                 instructions.update({
-                    'success': False,
-                    'error': error
+                    '__lineup__error__': {
+                        'traceback': error,
+                        'consume_queue_size': self.consume_queue.get_size(),
+                        'produce_queue_size': self.produce_queue.get_size(),
+                    }
                 })
                 self.produce(instructions)
                 self.do_rollback(instructions)

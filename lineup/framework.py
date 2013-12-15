@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+import sys
 import os
 import socket
 import time
 import signal
 import traceback
 from lineup.datastructures import Queue
-from lineup.backends.redis import JSONRedisBackend
 
 
 class Node(object):
     timeout = -1
-    def __init__(self, backend_class=JSONRedisBackend, *args, **kw):
-        self.children = []
+    def __init__(self, backend_class, *args, **kw):
+        self.workers = []
         self.backend_class = backend_class
         signal.signal(signal.SIGINT, self.handle_control_c)
         self.__started = False
@@ -26,14 +26,14 @@ class Node(object):
         for child in self.workers:
             child.stop()
 
-        raise SystemExit
+        sys.exit(1)
 
     def initialize(self, *args, **kw):
         pass
 
     @property
     def id(self):
-        return '|'.join([self.get_hostname(), str(os.getpid())])
+        return '|'.join([self.get_name(), self.get_hostname(), str(os.getpid())])
 
     @property
     def taxonomy(self):
@@ -58,32 +58,17 @@ class Node(object):
 
     def feed(self, item):
         self._start()
-        while not self.running:
+        while not self.is_running():
             time.sleep(0)
 
-        result = self.input.put(item, wait=False)
-        return result
-
-    def enqueue_error(self, source_class, instructions, exception):
-        print exception, source_class, instructions
-
-    def wait_and_get_work(self):
-        return self.output.get()
+        self.input.put(item)
 
     def stop(self):
         for child in self.workers:
             child.stop()
 
-    @property
-    def running(self):
+    def is_running(self):
         return all([w.is_alive() for w in self.workers])
-
-    def are_running(self):
-        if self.running:
-            return True
-
-        self.start()
-        return self.running
 
 
 class Pipeline(Node):
@@ -111,7 +96,7 @@ class Pipeline(Node):
             b'queue',
             str(index),
         ])
-        return Queue(name, timeout=self.timeout)
+        return Queue(name, backend_class=self.backend_class, timeout=self.timeout)
 
     def get_queues(self):
         steps = getattr(self, 'steps', None) or []

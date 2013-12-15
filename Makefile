@@ -11,7 +11,7 @@ filename=lineup-`python -c 'import lineup.version;print lineup.version.version'`
 
 export PYTHONPATH:=  ${PWD}
 
-test: functional
+test: unit functional
 run_test:
 	@if [ -d tests/$(suite) ]; then \
 		if [ "`ls tests/$(suite)/*.py`" = "tests/$(suite)/__init__.py" ] ; then \

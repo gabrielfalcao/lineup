@@ -5,6 +5,7 @@ import os
 import socket
 from lineup import Step, Queue
 from lineup.framework import Pipeline, Node
+from lineup.backends.redis import JSONRedisBackend
 from .base import redis_test
 
 
@@ -18,12 +19,12 @@ def test_queue_adopt_producer_step(context):
     ("Queue#adopt_producer should take a step and know about its id and")
 
     # Given a dummy manager
-    manager = Node()
+    manager = Node(JSONRedisBackend)
 
     # Given a Queue with maximum size of 10
-    queue = Queue('test-queue', maxsize=10)
-    q1 = Queue('name1')
-    q2 = Queue('name2')
+    queue = Queue('test-queue', backend_class=JSONRedisBackend, maxsize=10)
+    q1 = Queue('name1', backend_class=JSONRedisBackend)
+    q2 = Queue('name2', backend_class=JSONRedisBackend)
     # And a running step (so it gains a thread id)
     step = DummyStep(q1, q2, manager)
     step.start()
@@ -35,15 +36,15 @@ def test_queue_adopt_producer_step(context):
     hostname = socket.gethostname()
     pid = os.getpid()
     tid = step.ident
-    value = '{hostname}|{pid}|{tid}|tests.functional.test_queue.DummyStep|lineup.framework.Node'.format(**locals())
+    value = 'lineup.framework.Node|{hostname}|{pid}|{tid}|tests.functional.test_queue.DummyStep|lineup.framework.Node'.format(**locals())
 
     members = context.redis.smembers('lineup:test-queue:producers')
     members.should.contain(value)
 
 
 @redis_test
-def test_put_waits_to_consume(context):
-    ("Queue#put should wait until someone consumes and returns the previous queue size and the current queue size")
+def test_pipeline(context):
+    ("Pipeline should process steps")
 
     class CoolStep(Step):
         def consume(self, instructions):
@@ -58,10 +59,73 @@ def test_put_waits_to_consume(context):
     class CoolFooBar(Pipeline):
         steps = [CoolStep, SaveStep]
 
-    manager = CoolFooBar()
-    previous, current = manager.feed({'foo': 'Bar'})
-    manager.get_result().should.equal({"SAVED": {'cool': {'foo': 'Bar'}}})
+    manager = CoolFooBar(JSONRedisBackend)
+    manager.feed({'foo': 'Bar'})
 
-    previous.should.equal(0)
-    current.should.equal(1)
+    result= manager.get_result()
+    manager.stop()
+
+    result.should.equal({"SAVED": {'cool': {'foo': 'Bar'}}})
     context.redis.get("WORKED").should.equal("YES")
+
+
+
+@redis_test
+def test_pipeline_exception(context):
+    ("Pipeline should handle exceptions")
+
+    class CoolStep(Step):
+        def consume(self, instructions):
+            self.produce({'cool': instructions})
+
+    class BoomStep(Step):
+        def consume(self, instructions):
+            raise ValueError("BOOM")
+
+    class CoolFooBar(Pipeline):
+        steps = [CoolStep, BoomStep]
+
+    manager = CoolFooBar(JSONRedisBackend)
+    manager.feed({'foo': 'Bar'})
+
+    result= manager.get_result()
+    manager.stop()
+
+    result.should.be.a(dict)
+    result.should.have.key('cool').being.equal({'foo': 'Bar'})
+    result.should.have.key('__lineup__error__').being.have.key("traceback")
+    result['__lineup__error__']['traceback'].should.contain("ValueError: BOOM")
+    result['__lineup__error__']['consume_queue_size'].should.equal(0)
+    result['__lineup__error__']['produce_queue_size'].should.equal(0)
+
+
+@redis_test
+def test_pipeline_exception_bad_rollback(context):
+    ("Pipeline should handle exceptions")
+
+    class AwesomeStep(Step):
+        def consume(self, instructions):
+            self.produce({'awesome': instructions})
+
+    class BoomStep(Step):
+        def consume(self, instructions):
+            raise ValueError("BOOM")
+
+        def rollback(self, instructions):
+            ValueError("ROLLBACK HELL")
+
+    class AwesomeFooBar(Pipeline):
+        steps = [AwesomeStep, BoomStep]
+
+    manager = AwesomeFooBar(JSONRedisBackend)
+    manager.feed({'foo': 'Bar'})
+
+    result= manager.get_result()
+    manager.stop()
+
+    result.should.be.a(dict)
+    result.should.have.key('awesome').being.equal({'foo': 'Bar'})
+    result.should.have.key('__lineup__error__').being.have.key("traceback")
+    result['__lineup__error__']['traceback'].should.contain("ValueError: BOOM")
+    result['__lineup__error__']['consume_queue_size'].should.equal(0)
+    result['__lineup__error__']['produce_queue_size'].should.equal(0)
