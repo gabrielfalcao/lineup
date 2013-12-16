@@ -19,7 +19,7 @@ easy_install curdling
 curd install lineup
 ```
 
-## Philosofy
+## Philosophy
 
 Lineup focus in:
 

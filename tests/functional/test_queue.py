@@ -25,6 +25,7 @@ def test_queue_adopt_producer_step(context):
     queue = Queue('test-queue', backend_class=JSONRedisBackend, maxsize=10)
     q1 = Queue('name1', backend_class=JSONRedisBackend)
     q2 = Queue('name2', backend_class=JSONRedisBackend)
+
     # And a running step (so it gains a thread id)
     step = DummyStep(q1, q2, manager)
 
@@ -39,7 +40,8 @@ def test_queue_adopt_producer_step(context):
 
     members = context.redis.smembers('lineup:test-queue:producers')
     members.should.contain(value)
-
+    repr(q1).should.equal(
+        '<lineup.Queue(lineup:name1, backend=<JSONRedisBackend>)>')
 
 @redis_test
 def test_pipeline(context):

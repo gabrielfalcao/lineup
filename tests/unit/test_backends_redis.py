@@ -34,22 +34,6 @@ def test_redis_instance(StrictRedis):
     instance.redis.should.equal(StrictRedis.return_value)
 
 
-def test_get_name():
-    ("JSONRedisBackend#get_name should return class name by default")
-
-    class MyBackend(JSONRedisBackend):
-        pass
-
-    # Given an instance of a backend
-    backend = MyBackend()
-
-    # When I call get_name()
-    result = backend.get_name()
-
-    # Then it should be the class name
-    result.should.equal("JSONRedisBackend()")
-
-
 @patch('lineup.backends.redis.json')
 def test_serialize(json):
     ("JSONRedisBackend#serialize should return the content json serialized")

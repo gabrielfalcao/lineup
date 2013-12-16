@@ -14,6 +14,7 @@ from redis import StrictRedis
 from threading import Thread, Event
 from lineup.datastructures import Queue
 
+
 class KeyMaker(object):
     def __init__(self, step):
         self.step = step
@@ -21,7 +22,7 @@ class KeyMaker(object):
         for name in ['logging', 'alive', 'error']:
             setattr(self, name, self.make_key(name))
 
-    def make_key(self, suffix, prefix=None):
+    def make_key(self, suffix):
         return ":".join(['lineup', self.step.name, suffix])
 
 

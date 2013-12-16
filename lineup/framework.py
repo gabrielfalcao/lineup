@@ -23,9 +23,7 @@ class Node(object):
         return self.backend_class(*args, **kwargs)
 
     def handle_control_c(self, signal, frame):
-        for child in self.workers:
-            child.stop()
-
+        self.stop()
         sys.exit(1)
 
     def initialize(self, *args, **kw):
@@ -63,6 +61,8 @@ class Node(object):
     def stop(self):
         for child in self.workers:
             child.stop()
+
+        self.__started = False
 
     @property
     def started(self):
@@ -102,9 +102,6 @@ class Pipeline(Node):
                      timeout=self.timeout)
 
     def get_queues(self):
-        if hasattr(self, 'queues'):
-            return self.queues
-
         steps = getattr(self, 'steps', None) or []
         indexes = xrange(len(steps) + 1)
         queues = map(self.make_queue, indexes)

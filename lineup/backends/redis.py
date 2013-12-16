@@ -37,9 +37,6 @@ class JSONRedisBackend(BaseBackend):
     def initialize(self):
         self.redis = StrictRedis()
 
-    def get_name(self):
-        return 'JSONRedisBackend()'
-
     def serialize(self, value):
         return json.dumps(value)
 

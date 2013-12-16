@@ -280,24 +280,6 @@ def test_pipeline_make_queue(Queue):
         timeout='forever')
 
 
-def test_pipeline_get_queues_when_exist():
-    ("Pipeline#get_queues should return existing "
-     "queues if they exist")
-
-    # Given a Pipeline that already has queues
-    class MyPipe(TestPipeline):
-        def __init__(self):
-            self.queues = ['q1', 'q2']
-
-    pipe = MyPipe()
-
-    # When I call get_queues
-    result = pipe.get_queues()
-
-    # Then it should have returned the existing queues
-    result.should.equal(['q1', 'q2'])
-
-
 def test_pipeline_get_queues():
     ("Pipeline#get_queues should make queues and return them")
 
