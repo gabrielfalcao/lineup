@@ -11,7 +11,7 @@ import logging
 import traceback
 from pprint import pformat
 from redis import StrictRedis
-from threading import Thread, Event, RLock
+from threading import Thread, Event
 from lineup.datastructures import Queue
 
 class KeyMaker(object):
@@ -22,24 +22,23 @@ class KeyMaker(object):
             setattr(self, name, self.make_key(name))
 
     def make_key(self, suffix, prefix=None):
-        prefix = prefix or getattr(self, 'prefix', 'lineup')
-        return ":".join([prefix, self.step.name, suffix])
+        return ":".join(['lineup', self.step.name, suffix])
 
 
 
 class Step(Thread):
+    # TODO: use AST to make sure that the subclasses are
     def __init__(self, consume_queue, produce_queue, parent):
-
         self.parent = parent
         self.consume_queue = consume_queue
         self.produce_queue = produce_queue
-        self.lock = RLock()
         self.backend = parent.get_backend()
 
         self.ready = Event()
         self.ready.clear()
 
         super(Step, self).__init__()
+
         self.daemon = True
         self.key = KeyMaker(self)
         self.name = getattr(self.__class__,
@@ -51,7 +50,7 @@ class Step(Thread):
     def get_name(self):
         return getattr(self, 'name', None) or self.taxonomy
 
-    def __str__(self):
+    def __repr__(self):
         return '<{0}>'.format(self.ancestry)
 
     @property
@@ -75,7 +74,6 @@ class Step(Thread):
             'when': time.time()
         })
 
-
     def do_consume(self, instructions):
         return self.consume(instructions)
 
@@ -92,45 +90,42 @@ class Step(Thread):
         self.rollback(instructions)
 
     def rollback(self, instructions):
-        pass
+        self.consume_queue.put(instructions)
 
     def stop(self):
         return self.ready.set()
 
     def is_active(self):
         is_locked = self.ready.is_set()
-        timeout = self.parent.timeout
-
-        if timeout < 0:
-            timeout = None
-
-        if is_locked:
-            self.ready.wait(timeout)
-
         return not is_locked
 
     def run(self):
         while self.is_active():
-            self.before_consume()
+            self.loop()
 
-            instructions = self.consume_queue.get(wait=True)
+    def loop(self):
+        self.before_consume()
 
-            try:
-                self.do_consume(instructions)
-            except Exception as e:
-                error = traceback.format_exc(e)
-                self.log(error)
-                instructions.update({
-                    '__lineup__error__': {
-                        'traceback': error,
-                        'consume_queue_size': self.consume_queue.get_size(),
-                        'produce_queue_size': self.produce_queue.get_size(),
-                    }
-                })
-                self.produce(instructions)
-                self.do_rollback(instructions)
-                continue
-            finally:
-                self.ready.clear()
+        instructions = self.consume_queue.get(wait=True)
 
-            self.after_consume(instructions)
+        try:
+            self.do_consume(instructions)
+        except Exception as e:
+            self.handle_exception(e, instructions)
+        finally:
+            self.ready.clear()
+
+        self.after_consume(instructions)
+
+    def handle_exception(self, e, instructions):
+        error = traceback.format_exc(e)
+        self.log(error)
+        instructions.update({
+            '__lineup__error__': {
+                'traceback': error,
+                'consume_queue_size': self.consume_queue.get_size(),
+                'produce_queue_size': self.produce_queue.get_size(),
+            }
+        })
+        self.produce(instructions)
+        self.do_rollback(instructions)
