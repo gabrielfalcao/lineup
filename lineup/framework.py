@@ -58,14 +58,15 @@ class Node(object):
 
     def feed(self, item):
         self._start()
-        while not self.is_running():
-            time.sleep(0)
-
         self.input.put(item)
 
     def stop(self):
         for child in self.workers:
             child.stop()
+
+    @property
+    def started(self):
+        return self.__started
 
     def is_running(self):
         return all([w.is_alive() for w in self.workers])
@@ -96,13 +97,20 @@ class Pipeline(Node):
             b'queue',
             str(index),
         ])
-        return Queue(name, backend_class=self.backend_class, timeout=self.timeout)
+        return Queue(name,
+                     backend_class=self.backend_class,
+                     timeout=self.timeout)
 
     def get_queues(self):
+        if hasattr(self, 'queues'):
+            return self.queues
+
         steps = getattr(self, 'steps', None) or []
         indexes = xrange(len(steps) + 1)
         queues = map(self.make_queue, indexes)
         return queues
 
     def make_worker(self, Worker, index):
-        return Worker(self.queues[index], self.queues[index + 1], self)
+        previous = self.queues[index]
+        following = self.queues[index + 1]
+        return Worker(previous, following, self)

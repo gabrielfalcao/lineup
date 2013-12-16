@@ -75,16 +75,6 @@ class Step(Thread):
             'when': time.time()
         })
 
-    def fail(self, exception, instructions):
-        error = traceback.format_exc(exception)
-        message = 'The worker %s failed while being processed at the pipeline "%s"'
-        args = (self.name, self.parent.get_name())
-        self.logger.exception(message, *args)
-        self.parent.enqueue_error(source_class=self.__class__, instructions=instructions, exception=exception)
-        return self.backend.rpush(self.key.logging, {
-            'message': message % args,
-            'when': time.time()
-        })
 
     def do_consume(self, instructions):
         return self.consume(instructions)
@@ -99,10 +89,7 @@ class Step(Thread):
         self.log("%s is done", self)
 
     def do_rollback(self, instructions):
-        try:
-            self.rollback(instructions)
-        except Exception as e:
-            self.fail(e, instructions)
+        self.rollback(instructions)
 
     def rollback(self, instructions):
         pass
@@ -127,9 +114,6 @@ class Step(Thread):
             self.before_consume()
 
             instructions = self.consume_queue.get(wait=True)
-
-            if not instructions:
-                continue
 
             try:
                 self.do_consume(instructions)
