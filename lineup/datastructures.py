@@ -26,12 +26,10 @@
 
 from __future__ import unicode_literals
 
-import time
-from lineup.backends.redis import JSONRedisBackend
-
 
 class Queue(object):
     prefix = 'lineup'
+
     def __init__(self, name, backend_class, maxsize=None, timeout=-1):
         self.name = ':'.join([self.prefix, name])
         self.maxsize = maxsize

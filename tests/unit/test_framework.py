@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
-from mock import Mock, patch, call
+from mock import Mock, patch
 from lineup.framework import Node, Pipeline
 
 
 class TestBackend(object):
     pass
+
 
 class TestPipeline(Pipeline):
     def __init__(self):
@@ -102,8 +103,7 @@ def test_node_start():
     node.started.should.be.true
 
 
-@patch('lineup.framework.time')
-def test_node_feed(time):
+def test_node_feed():
     ("Node#feed should start, wait until it's running and put the first item")
 
     # Given a fake backend

@@ -25,7 +25,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals, absolute_import
-import sys
 import json
 
 from lineup.backends.base import BaseBackend, io_operation
@@ -62,7 +61,7 @@ class JSONRedisBackend(BaseBackend):
 
     @io_operation
     def lrange(self, key, start, stop):
-        return map(self.deserialize, self.redis.lrange(key, start,stop))
+        return map(self.deserialize, self.redis.lrange(key, start, stop))
 
     @io_operation
     def rpop(self, key):

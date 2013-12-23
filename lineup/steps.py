@@ -3,16 +3,11 @@
 #
 from __future__ import unicode_literals
 
-import sys
 import time
-import json
-import signal
 import logging
 import traceback
-from pprint import pformat
-from redis import StrictRedis
+
 from threading import Thread, Event
-from lineup.datastructures import Queue
 
 
 class KeyMaker(object):
@@ -24,7 +19,6 @@ class KeyMaker(object):
 
     def make_key(self, suffix):
         return ":".join(['lineup', self.step.name, suffix])
-
 
 
 class Step(Thread):

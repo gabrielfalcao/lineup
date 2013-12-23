@@ -4,14 +4,13 @@ from __future__ import unicode_literals
 import sys
 import os
 import socket
-import time
 import signal
-import traceback
 from lineup.datastructures import Queue
 
 
 class Node(object):
     timeout = -1
+
     def __init__(self, backend_class, *args, **kw):
         self.workers = []
         self.backend_class = backend_class
@@ -31,7 +30,12 @@ class Node(object):
 
     @property
     def id(self):
-        return '|'.join([self.get_name(), self.get_hostname(), str(os.getpid())])
+        parts = [
+            self.get_name(),
+            self.get_hostname(),
+            str(os.getpid()),
+        ]
+        return '|'.join(parts)
 
     @property
     def taxonomy(self):
@@ -77,7 +81,8 @@ class Pipeline(Node):
 
     def initialize(self, *args, **kwargs):
         self.queues = self.get_queues(*args, **kwargs)
-        self.workers = [self.make_worker(Worker, index) for index, Worker in enumerate(self.steps)]
+        isteps = enumerate(self.steps)
+        self.workers = [self.make_worker(Type, i) for i, Type in isteps]
 
     @property
     def input(self):

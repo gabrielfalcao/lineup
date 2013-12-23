@@ -32,6 +32,9 @@ unit:
 functional:
 	@make run_test suite=functional
 
+lint:
+	@flake8 lineup
+
 acceptance:
 	@steadymark README.md
 	@steadymark docs/*.md
