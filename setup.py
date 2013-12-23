@@ -86,7 +86,7 @@ if __name__ == '__main__':
     setup(
         name="lineup",
         version=read_version(),
-        description='Concurrent package manager for Python',
+        description='Distributed Pipeline Framework for Python',
         long_description=local_file('README.md'),
         author='Gabriel Falcao',
         author_email='gabriel@nacaolivre.org',
