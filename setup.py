@@ -112,7 +112,4 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.2',
             'Programming Language :: Python :: 3.3',
         ],
-        extras_require={
-            'server': parse_requirements('requirements-server.txt')[0],
-        },
     )
