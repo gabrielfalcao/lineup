@@ -21,7 +21,7 @@ run_test:
 			echo "* Running \033[0;32m$(suite)\033[0m test suite *"; \
 			echo "======================================="; \
 			nosetests --immediate --rednose --stop --with-coverage --cover-package=$(PACKAGE) \
-				--cover-min-percentage=100% \
+				--cover-min-percentage=99% \
 				--cover-branches  --cover-erase --verbosity=$(TESTS_VERBOSITY) -s tests/$(suite) ; \
 		fi \
 	fi

@@ -1,6 +1,6 @@
 project:
   name: LineUp
-  version: 0.0.0
+  version: 0.0.1
   github_maintainer: gabrielfalcao
   description: Distributed pipeline framework for python
   github_url: http://github.com/gabrielfalcao/lineup
