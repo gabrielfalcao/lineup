@@ -87,7 +87,7 @@ if __name__ == '__main__':
         name="lineup",
         version=read_version(),
         description='Distributed Pipeline Framework for Python',
-        long_description=local_file('README.md'),
+        long_description=local_file('readme.rst'),
         author='Gabriel Falcao',
         author_email='gabriel@nacaolivre.org',
         url='https://github.com/weedlabs/lineup',
