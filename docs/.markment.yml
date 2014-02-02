@@ -1,6 +1,6 @@
 project:
   name: LineUp
-  version: 0.1.0
+  version: 0.1.1
   github_maintainer: weedlabs
   description: Distributed pipeline framework for python
   github_url: http://github.com/weedlabs/lineup
