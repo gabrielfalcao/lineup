@@ -116,6 +116,9 @@ Type `lineup --help` for more info.
 ### Running a pipeline in foreground
 
 ```bash
+# Lineup will connect to this redis
+export LINEUP_REDIS_URI='redis://0@localhost:6379'
+
 lineup downloader run --output=rpush@example-output
 ```
 

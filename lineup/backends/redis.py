@@ -25,6 +25,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals, absolute_import
+import os
 import json
 from milieu import Environment
 
@@ -33,13 +34,15 @@ from lineup.backends.base import BaseBackend, io_operation
 from redis import StrictRedis
 
 env = Environment()
+os.environ.setdefault('LINEUP_REDIS_URI', 'redis://1@localhost:6379')
 
 
 class JSONRedisBackend(BaseBackend):
     def initialize(self):
         conf = env.get_uri("LINEUP_REDIS_URI")
+
         self.redis = StrictRedis(
-            db=conf.user or 0,
+            db=conf.username or 0,
             host=conf.host,
             port=conf.port,
             # using `path` as password to support the URI like:
