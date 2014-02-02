@@ -11,6 +11,8 @@ class TestBackend(object):
 
 
 class TestPipeline(Pipeline):
+    name = 'test-pipeline'
+
     def __init__(self):
         self.backend_class = TestBackend
 
@@ -179,6 +181,7 @@ def test_pipeline_initialize():
 
     # And a pipeline that mocks out get_queues and make_worker
     class MyPipe(Pipeline):
+        name = 'mypipe1'
         get_queues = Mock(name='MyPipe.get_queues')
         make_worker = Mock(name='MyPipe.make_worker')
         steps = ['step1', 'step2']
@@ -210,6 +213,7 @@ def test_pipeline_input():
     q2 = Mock(name='Queue(2)')
 
     class MyPipe(Pipeline):
+        name = 'mypipe2'
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -228,6 +232,7 @@ def test_pipeline_output():
     q2 = Mock(name='Queue(2)')
 
     class MyPipe(Pipeline):
+        name = 'mypipe3'
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -246,6 +251,7 @@ def test_pipeline_get_result():
     q2 = Mock(name='Queue(2)')
 
     class MyPipe(Pipeline):
+        name = 'mypipe4'
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -285,6 +291,7 @@ def test_pipeline_get_queues():
 
     # Given a Pipeline that already has queues
     class MyPipe(TestPipeline):
+        name = 'mypipe5'
         steps = ['step1', 'step2']
         make_queue = Mock(name='MyPipe.make_queue')
 
@@ -322,6 +329,7 @@ def test_pipeline_make_worker():
             self.manager = manager
 
     class MyPipe(Pipeline):
+        name = 'mypipe6'
         def __init__(self):
             self.queues = [q1, q2, q3, q4, q5, q6]
 

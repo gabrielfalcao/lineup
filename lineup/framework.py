@@ -6,6 +6,7 @@ import os
 import socket
 import signal
 from lineup.datastructures import Queue
+from lineup.core import PipelineRegistry
 
 
 class Node(object):
@@ -78,6 +79,8 @@ class Node(object):
 
 class Pipeline(Node):
     timeout = -1
+
+    __metaclass__ = PipelineRegistry
 
     def initialize(self, *args, **kwargs):
         self.queues = self.get_queues(*args, **kwargs)

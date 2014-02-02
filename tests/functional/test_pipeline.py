@@ -18,6 +18,7 @@ def test_pipeline_should_stop_upon_sigint(sys):
             self.produce(instructions)
 
     class Things(Pipeline):
+        name = 'things-1'
         steps = [
             SimpleStep,
             SimpleStep,

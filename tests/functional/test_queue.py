@@ -58,6 +58,7 @@ def test_pipeline(context):
             self.produce({"SAVED": instructions})
 
     class OkFooBar(Pipeline):
+        name = 'okfoobar'
         steps = [OkStep, SaveStep]
 
     manager = OkFooBar(JSONRedisBackend)
@@ -84,6 +85,7 @@ def test_pipeline_exception(context):
             raise ValueError("BOOM")
 
     class CoolFooBar(Pipeline):
+        name = 'coolfoobar'
         steps = [CoolStep, BoomStep]
 
     manager = CoolFooBar(JSONRedisBackend)
@@ -116,6 +118,7 @@ def test_pipeline_exception_bad_rollback(context):
             ValueError("ROLLBACK HELL")
 
     class AwesomeFooBar(Pipeline):
+        name = 'awesomefoobar'
         steps = [AwesomeStep, BoomStep]
 
     manager = AwesomeFooBar(JSONRedisBackend)
