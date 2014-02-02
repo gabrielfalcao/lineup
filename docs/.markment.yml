@@ -8,3 +8,9 @@ project:
 
 documentation:
   index: intro.md
+
+toc:
+  - intro.md
+  - getting-started.md
+  - how-to-cli.md
+  - how-to-steps.md
