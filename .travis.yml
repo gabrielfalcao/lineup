@@ -17,7 +17,7 @@ cache:
     - $HOME/.curds
 
 install:
-  - pip install curdling
+  - pip install curdling flake8
   - curd install -r requirements.txt
 
 script:
