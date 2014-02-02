@@ -43,7 +43,7 @@ docs: clean
 	@git co master && \
 		(git br -D gh-pages || printf "") && \
 		git checkout --orphan gh-pages && \
-		markment -o . -t theme docs --sitemap-for=http://falcao.it/lineup && \
+		markment -o . -t rtd docs --sitemap-for=http://falcao.it/lineup && \
 		cp quick-start.html index.html && \
 		git add . && \
 		git commit -am 'documentation' && \
