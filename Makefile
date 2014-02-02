@@ -2,6 +2,7 @@
 PACKAGE=lineup  # the python module name
 TESTS_VERBOSITY=2
 export PYTHONPATH:=${PWD}:$$PYTHONPATH
+export PYTHONDONTWRITEBYTECODE:=x
 # </variables>
 
 EXTRA_TEST_TASKS=
