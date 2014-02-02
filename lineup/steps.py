@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
+import re
 import sys
 import time
 import logging
@@ -117,7 +118,7 @@ class Step(Thread):
             self.loop()
 
     def log_key_error(self, exc, tb):
-        filename = tb.tb_frame.f_code.co_filename
+        filename = re.sub(r'py[cao]$', 'py', tb.tb_frame.f_code.co_filename)
         lineno = tb.tb_frame.f_code.co_firstlineno
         message = (
             "LineUpKeyError:\n%s\n\033[1;33m"
