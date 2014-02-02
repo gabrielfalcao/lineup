@@ -474,7 +474,7 @@ def test_step_loop_upon_exception():
 
     MyStep.do_consume.assert_called_once_with('instructions')
     MyStep.handle_exception.assert_called_once_with(
-        nopyc(mock.__file__), 'instructions')
+        exc, 'instructions')
 
     stack.should.equal([
         ('before_consume', (step,), {}),
