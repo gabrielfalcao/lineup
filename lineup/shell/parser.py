@@ -34,6 +34,13 @@ def main():
     )
 
     parser.add_argument(
+        '-W', '--working-dir',
+        type=str,
+        help=("A path where lineup will scan for pipelines recursively"),
+        default=".",
+    )
+
+    parser.add_argument(
         '-l', '--log-level',
         type=str,
         default='info',

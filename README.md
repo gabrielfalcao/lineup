@@ -42,7 +42,7 @@ import codecs
 import requests
 
 from lineup import Step
-
+from lineup import Pipeline
 
 class Download(Step):
     def after_consume(self, instructions):
@@ -94,8 +94,6 @@ class Cache(Step):
 
 
 # Defining pipelines
-
-from lineup import Pipeline
 
 class SimpleUrlDownloader(Pipeline):
     name = 'downloader'

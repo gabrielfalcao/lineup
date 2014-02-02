@@ -30,7 +30,7 @@ class Command(object):
         coloredlogs.install(level=log_level)
         self._pipeline = None
         self.scanner = PipelineScanner(
-            lookup_path=".")
+            lookup_path=self.args.working_dir)
 
     def get_pipeline_class(self):
         choices = self.scanner.get_pipelines()
