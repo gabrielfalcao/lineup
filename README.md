@@ -32,11 +32,11 @@ Steps must always implement the method `consume(self, instructions)` and
 always call `self.produce()` with it's portion of work.
 
 
-### Example: Downloader with local cache
+### Example: a pipeline that downloads files
+
+This is a copy of the [examples](examples) folder.
 
 ```python
-# myapp/workers.py
-
 import re
 import codecs
 import requests
@@ -91,17 +91,11 @@ class Cache(Step):
             }
         self.produce(instructions)
 
-```
-
-### Defining pipelines
 
 
-```python
-# myapp/pipelines.py
+# Defining pipelines
 
 from lineup import Pipeline
-from example.workers import Download, Cache
-
 
 class SimpleUrlDownloader(Pipeline):
     name = 'downloader'

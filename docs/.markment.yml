@@ -7,4 +7,4 @@ project:
   tarball_download_url: https://github.com/gabrielfalcao/lineup/archive/master.tar.gz
 
 documentation:
-  index: introduction.md
+  index: intro.md

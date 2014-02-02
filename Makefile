@@ -34,17 +34,14 @@ lint:
 	@flake8 lineup
 
 acceptance:
-	@steadymark README.md
-	@steadymark docs/*.md
+	@PYTHONPATH=`pwd` steadymark README.md
+	@PYTHONPATH=`pwd` steadymark docs/*.md
 
-docs: clean
-	env
-	@steadymark docs/*.md
+docs: acceptance
 	@git co master && \
 		(git br -D gh-pages || printf "") && \
 		git checkout --orphan gh-pages && \
-		markment -o . -t rtd docs --sitemap-for=http://falcao.it/lineup && \
-		cp quick-start.html index.html && \
+		markment --autoindex -o . -t rtd docs --sitemap-for=http://falcao.it/lineup && \
 		git add . && \
 		git commit -am 'documentation' && \
 		git push --force origin gh-pages && \
