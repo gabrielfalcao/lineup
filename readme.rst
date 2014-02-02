@@ -33,19 +33,19 @@ Defining steps
 Steps must always implement the method ``consume(self, instructions)``
 and always call ``self.produce()`` with it's portion of work.
 
-Example: Downloader with local cache
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example: a pipeline that downloads files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is a copy of the `examples <examples>`__ folder.
 
 .. code:: python
-
-    # myapp/workers.py
 
     import re
     import codecs
     import requests
 
     from lineup import Step
-
+    from lineup import Pipeline
 
     class Download(Step):
         def after_consume(self, instructions):
@@ -94,16 +94,9 @@ Example: Downloader with local cache
                 }
             self.produce(instructions)
 
-Defining pipelines
-~~~~~~~~~~~~~~~~~~
 
-.. code:: python
 
-    # myapp/pipelines.py
-
-    from lineup import Pipeline
-    from example.workers import Download, Cache
-
+    # Defining pipelines
 
     class SimpleUrlDownloader(Pipeline):
         name = 'downloader'
@@ -125,6 +118,9 @@ Running a pipeline in foreground
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: bash
+
+    # Lineup will connect to this redis
+    export LINEUP_REDIS_URI='redis://0@localhost:6379'
 
     lineup downloader run --output=rpush@example-output
 
