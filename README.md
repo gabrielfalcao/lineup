@@ -31,61 +31,66 @@ Lineup focus in:
 Steps must always implement the method `consume(self, instructions)` and
 always call `self.produce()` with it's portion of work.
 
-```python
 
-# myapp/tasks.py
+### Example: Downloader with local cache
+
+```python
+# myapp/workers.py
+
+import re
+import codecs
+import requests
 
 from lineup import Step
 
-import requests
 
-class Scraper(Step):
-    def consume(self):
-        url = instructions['url']
-        response = requests.get(url)
+class Download(Step):
+    def after_consume(self, instructions):
+        self.log(
+            "Done downloading %s",
+            instructions['url'],
+        )
 
-        # pretend you generated a
-        # list of things or general
-        # metadata
-
-        results = [
-            'https://2.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-            'https://1.gravatar.com/avatar/b9aa05d9efc6a3c8eda50f7763ad0715'
-            'https://0.gravatar.com/avatar/605d445205b61ec11185a28dc4ab9323'
-            'https://0.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-            'https://1.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-            'https://0.gravatar.com/avatar/29701ae503ec7d9e670edaf095503067'
-            'https://2.gravatar.com/avatar/605d445205b61ec11185a28dc4ab9323'
-            'https://2.gravatar.com/avatar/68edef29d4c6826af22d6fcbbf8f1084'
-        ]
-
-        self.produce({
-            'images-to-download': results,
-        })
-
-
-class Downloader(Step):
-    import re
-
-    def make_filename(self, index):
-        original_url = self.payload['initial']['url']
-        slug = re.sub(r'\W+', '-', original_url)
-        return ".".join([slug.strip('-'), index,'.png'])
+    def before_consume(self):
+        self.log("The downloader is ready")
 
     def consume(self, instructions):
-        images_to_download = instructions['images-to-download']
-        filenames = []
-        for index, image in enumerate(images_to_download):
-            filename = self.make_filename(index)
-            response = requests.get(image)
+        url = instructions['url']
+        method = instructions.get('method', 'get').lower()
 
-            with open(filename) as f:
-                f.write(response.content)
-                filenames.append(filename)
+        http_request = getattr(requests, method)
+        response = http_request(url)
+        instructions['download'] = {
+            'content': response.content,
+            'headers': dict(response.headers),
+            'status_code': response.status_code,
+        }
+        self.produce(instructions)
 
-        self.produce({
-            'filenames': filenames
-        })
+
+class Cache(Step):
+    def after_consume(self, instructions):
+        self.log("Done caching %s", instructions.keys())
+
+    def before_consume(self):
+        self.log("The cacher is also ready")
+
+    def get_slug(self, url):
+        url = re.sub(r'^https?://', '', url)
+        url = re.sub(r'\W+', '-', url)
+        return url
+
+    def consume(self, instructions):
+        url = instructions['url']
+        name = self.get_slug(url)
+        with codecs.open(name, 'wb', 'utf-8') as fd:
+            fd.write(instructions['download']['content'])
+            fd.close()
+            instructions['cached_at'] = {
+                'filename': fd.name,
+            }
+        self.produce(instructions)
+
 ```
 
 ### Defining pipelines
@@ -95,22 +100,24 @@ class Downloader(Step):
 # myapp/pipelines.py
 
 from lineup import Pipeline
-from myapp.steps import Scraper, Downloader
+from example.workers import Download, Cache
 
-class GravatarScraping(Pipeline):
-    name = 'gravatars-from-github'
 
-    steps = [
-        Scraper,
-        Downloader
-    ]
-
+class SimpleUrlDownloader(Pipeline):
+    name = 'downloader'
+    steps = [Download, Cache]
 ```
 
-### Running
+### Running and feeding
 
 ```bash
-lineup gravatars-from-github {'url': 'https://github.com/trending/developers'}
+lineup downloader run --output=rpush@example-output
+```
+
+![example/run.png](example/run.png)
+
+```bash
+lineup downloader push {"url": "http://github.com/gabrielfalcao.keys"}
 ```
 
 

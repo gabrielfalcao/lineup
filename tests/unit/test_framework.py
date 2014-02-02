@@ -80,8 +80,8 @@ def test_node_id(socket, os):
     node.id.should.equal('lineup.framework.Node|localhost|123')
 
 
-def test_node_start():
-    ('Node#_start should start all workers and be idempotent')
+def test_noderun_daemon():
+    ('Node#run_daemon should start all workers and be idempotent')
 
     # Given a fake backend
     backend = Mock(name='backend')
@@ -94,8 +94,8 @@ def test_node_start():
     node.workers = [w1, w2]
 
     # When I start
-    node._start()
-    node._start()
+    node.run_daemon()
+    node.run_daemon()
 
     # Then it should have started each worker
     w1.start.assert_called_once_with()
@@ -114,7 +114,7 @@ def test_node_feed():
 
     # And a node
     node = Node(Backend)
-    node._start = Mock(name='node._start')
+    node.run_daemon = Mock(name='node.run_daemon')
     node.input = Mock(name='node.input')
     # When I feed
     node.feed({'an': 'item'})
@@ -122,7 +122,7 @@ def test_node_feed():
     # Then it should have started each worker
     node.input.put.assert_called_once_with({'an': 'item'})
 
-    node._start.assert_called_once_with()
+    node.run_daemon.assert_called_once_with()
 
 
 def test_node_stop():

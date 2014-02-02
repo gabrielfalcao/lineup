@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
-
+import sys
 import time
 import logging
 import traceback
 
 from threading import Thread, Event
+from lineup.core import LineUpPayloadDict, LineUpKeyError
+logger = logging.getLogger('lineup.steps')
 
 
 class KeyMaker(object):
@@ -38,7 +40,7 @@ class Step(Thread):
         self.key = KeyMaker(self)
         self.name = getattr(self.__class__,
                             'label', self.taxonomy)
-        self.logger = logging.getLogger(self.key.logging)
+
         consume_queue.adopt_consumer(self)
         produce_queue.adopt_producer(self)
 
@@ -63,29 +65,36 @@ class Step(Thread):
         return '|'.join([self.parent.id, str(self.ident), self.ancestry])
 
     def log(self, message, *args, **kw):
-        self.logger.info(message, *args, **kw)
+        logger.info(message, *args, **kw)
         return self.backend.rpush(self.key.logging, {
             'message': message % args % kw,
             'when': time.time()
         })
 
     def do_consume(self, instructions):
-        return self.consume(instructions)
+        # safe_instructions is a dictionary wrapped in a
+        # LineUpPayloadDict which fails gracefully when trying to get
+        # keys
+        safe_instructions = LineUpPayloadDict(instructions)
+        return self.consume(safe_instructions)
 
     def produce(self, payload):
         return self.produce_queue.put(payload)
 
     def before_consume(self):
-        self.log("%s is about to consume its queue", self)
+        self.log("%s is about to consume its queue", self.name)
 
     def after_consume(self, instructions):
-        self.log("%s is done", self)
+        self.log("%s is done", self.name)
 
     def do_rollback(self, instructions):
         self.rollback(instructions)
 
     def rollback(self, instructions):
-        self.consume_queue.put(instructions)
+        logger.error(
+            "The send data was lost: "
+            "\033[1;33m%s\033[0m", instructions,
+        )
 
     def stop(self):
         return self.ready.set()
@@ -105,8 +114,21 @@ class Step(Thread):
 
         try:
             self.do_consume(instructions)
+        except LineUpKeyError as e:
+            tb = sys.exc_info()[-1].tb_next.tb_next
+            filename = tb.tb_frame.f_code.co_filename
+            lineno = tb.tb_frame.f_code.co_firstlineno
+            message = (
+                "LineUpKeyError:\n%s\n\033[1;33m"
+                "In file %s line %s\033[0m\n"
+            )
+
+            logger.error(message,
+                         e, filename, lineno)
+
         except Exception as e:
             self.handle_exception(e, instructions)
+            logger.exception("%s failed", self)
         finally:
             self.ready.clear()
 
@@ -114,7 +136,7 @@ class Step(Thread):
 
     def handle_exception(self, e, instructions):
         error = traceback.format_exc(e)
-        self.log(error)
+
         instructions.update({
             '__lineup__error__': {
                 'traceback': error,
@@ -122,5 +144,5 @@ class Step(Thread):
                 'produce_queue_size': self.produce_queue.get_size(),
             }
         })
-        self.produce(instructions)
+
         self.do_rollback(instructions)

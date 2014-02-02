@@ -23,3 +23,18 @@ class Registry(type):
 
 class PipelineRegistry(Registry):
     kind = 'pipeline'
+
+
+class LineUpKeyError(KeyError):
+    pass
+
+
+class LineUpPayloadDict(dict):
+    def __getitem__(self, key, *args):
+        try:
+            value = super(LineUpPayloadDict, self).__getitem__(key, *args)
+            return value
+        except KeyError:
+            msg = ("expected key {1} to be present "
+                   "in the payload {0}".format(self, key))
+            raise LineUpKeyError(msg)

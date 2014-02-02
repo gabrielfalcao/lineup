@@ -6,13 +6,15 @@ from plant import Node
 
 from lineup.core import Registry
 
-logger = logging.getLogger('lineup.utils')
+
 logging.captureWarnings(True)
 
 pywarnings = logging.getLogger('py.warnings')
 pywarnings.level = logging.ERROR
 
 pywarnings.addHandler(logging.NullHandler(level=logging.ERROR))
+
+logger = logging.getLogger('lineup.utils')
 
 
 class PipelineScanner(object):
@@ -30,7 +32,7 @@ class PipelineScanner(object):
             try:
                 found.append(imp.load_source(module_name, node.path))
             except (ImportError, SystemError):
-                logger.debug("Failed to import %s", str(node))
+                logger.exception("Failed to import \033[1;33m%s\033[0m", str(node.path))
 
         return found
 

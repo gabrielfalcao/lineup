@@ -12,7 +12,11 @@ import coloredlogs
 logger = logging.getLogger('lineup.cli')
 
 from lineup.shell.commands import (
-    Command, RunPipeline, PushToPipeline)
+    Command,
+    RunPipeline,
+    StopPipeline,
+    PushToPipeline,
+)
 
 
 def main():
@@ -70,8 +74,26 @@ def main():
                            'option when running in production'),
     )
 
+    run.add_argument('--output',
+                     metavar='OUTPUT_URI',
+                     type=str,
+                     default='rpush@done',
+                     help=('Output to a given list'),
+    )
+
+    stop = subparsers.add_parser(
+        'stop', help='Stops the given pipeline')
+
+    stop.add_argument('--output',
+                     metavar='OUTPUT_URI',
+                     type=str,
+                     default='rpush@done',
+                     help=('Output to a given list'),
+    )
+
     Command.execute_from_root_parser(parser, subparsers=[
         ('run', run, RunPipeline),
+        ('stop', stop, StopPipeline),
         ('push', push, PushToPipeline),
     ])
 

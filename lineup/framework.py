@@ -50,7 +50,7 @@ class Node(object):
     def get_hostname(self):
         return socket.gethostname()
 
-    def _start(self):
+    def run_daemon(self):
         if self.__started:
             return
 
@@ -60,7 +60,6 @@ class Node(object):
         self.__started = True
 
     def feed(self, item):
-        self._start()
         self.input.put(item)
 
     def stop(self):

@@ -6,6 +6,8 @@ import sys
 import json
 import logging
 import coloredlogs
+from lineup import JSONRedisBackend
+
 from lineup.utils import PipelineScanner
 
 logger = logging.getLogger('lineup.cli')
@@ -19,8 +21,6 @@ class Command(object):
     def __init__(self, root_parser, sub_parser):
         self.root_parser = root_parser
         self.sub_parser = sub_parser
-        self.scanner = PipelineScanner(
-            lookup_path=".")
         self.args = self.root_parser.parse_known_args()[0]
 
         log_level = getattr(logging, self.args.log_level.upper(), None)
@@ -28,9 +28,11 @@ class Command(object):
             raise CLIError('invalid log level: {0}'.format(log_level))
 
         coloredlogs.install(level=log_level)
+        self._pipeline = None
+        self.scanner = PipelineScanner(
+            lookup_path=".")
 
-    @property
-    def pipeline(self):
+    def get_pipeline_class(self):
         choices = self.scanner.get_pipelines()
 
         if not self.args.pipeline_name:
@@ -40,10 +42,19 @@ class Command(object):
 
         found = choices.get(name)
         if not found:
-            raise CLIError('No such pipeline: {0}, options '
-                           'are \033[1;32m{1}\033[0m'.format(name, choices.keys()))
+            raise CLIError('No such pipeline: \033[1;33m{0}\033[0m, options '
+                           'are: \033[1;32m{1}\033[0m'.format(name, b", ".join(choices.keys())))
 
         return choices[name]
+
+    @property
+    def pipeline(self):
+        if self._pipeline:
+            return self._pipeline
+
+        CreatePipeline = self.get_pipeline_class()
+        self._pipeline = CreatePipeline(JSONRedisBackend)
+        return self._pipeline
 
     def execute(self, args, remainder):
 
@@ -71,11 +82,65 @@ class Command(object):
                 return cmd.execute(command_args, remainder_args)
 
 
+class RedisOutputProxy(object):
+    backend_class = JSONRedisBackend
+
+    def __init__(self, pipeline, directive, key):
+        self.pipeline = pipeline
+        self.key = key
+        self.backend = self.backend_class()
+        self.directive = getattr(self.backend, directive)
+        self.status_key = ':'.join(
+            [
+                'manage',
+                pipeline.name
+            ]
+        )
+
+    def open(self):
+        self.backend.set(self.status_key, 'open')
+        return self
+
+    def close(self):
+        self.backend.set(self.status_key, 'close')
+
+    def write(self, value):
+        return self.directive(self.key, value)
+
+    def is_open(self):
+        value = self.backend.get(self.status_key) or 'close'
+        value = value.lower()
+        return value == 'open'
+
+
 class RunPipeline(Command):
     name = 'run'
 
+    def get_output(self, arguments):
+        directive, key = arguments.output.split("@", 2)
+        output = RedisOutputProxy(self.pipeline, directive, key)
+        return output.open()
+
     def when_executed(self, arguments, remainder):
-        logger.warning("Ran successfully!")
+        self.pipeline.run_daemon()
+        output = self.get_output(arguments)
+
+        while output.is_open():
+            result = self.pipeline.output.get(wait=False)
+            if result:
+                output.write(result)
+
+        logger.warning("%s has stopped gracefully",
+                       self.pipeline)
+
+
+class StopPipeline(RunPipeline):
+    name = 'stop'
+
+    def when_executed(self, arguments, remainder):
+        output = self.get_output(arguments)
+        output.close()
+        logger.warning("Stopping %s", self.pipeline)
 
 
 class PushToPipeline(Command):
@@ -88,4 +153,5 @@ class PushToPipeline(Command):
 
     def when_executed(self, arguments, remainder):
         data = self.get_json_data(arguments)
-        logger.warning("Pushing %s", data)
+        for item in data:
+            self.pipeline.feed(item)

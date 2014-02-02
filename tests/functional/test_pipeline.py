@@ -26,7 +26,7 @@ def test_pipeline_should_stop_upon_sigint(sys):
         ]
 
     pipeline = Things(JSONRedisBackend)
-    pipeline._start()
+    pipeline.run_daemon()
     pipeline.is_running().should.be.true
     pipeline.started.should.be.true
 
