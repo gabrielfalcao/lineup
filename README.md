@@ -108,6 +108,19 @@ class SimpleUrlDownloader(Pipeline):
     steps = [Download, Cache]
 ```
 
+## Command line
+
+
+When running from the command line, lineup will recursively try to
+import all python files given as `--working-dir` argument, which
+defaults to the relative equivalent to `os.getcwd()`.
+
+In other words it will find your stuff automatically in dir you run
+the pipeline from, or from the `--working-dir` arg.
+
+Type `lineup --help` for more info.
+
+
 ### Running a pipeline in foreground
 
 ```bash
@@ -122,6 +135,8 @@ lineup downloader run --output=rpush@example-output
 ```bash
 lineup downloader push {"url": "http://github.com/gabrielfalcao.keys"}
 ```
+
+![example/run.png](example/push.png)
 
 ### Feeding a pipeline programatically
 
