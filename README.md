@@ -1,8 +1,8 @@
-[![Build Status](https://travis-ci.org/gabrielfalcao/lineup.png)](https://travis-ci.org/gabrielfalcao/lineup)
+[![Build Status](https://travis-ci.org/weedlabs/lineup.png)](https://travis-ci.org/weedlabs/lineup)
 # LineUp - Distributed Pipeline Framework for Python
 
 Lineup is a redis-based
-[pipeline](http://en.wikipedia.org/wiki/Pipeline_(software) framework
+[pipeline](http://en.wikipedia.org/wiki/Pipeline_(software)) framework
 that turns horizontal scalling seamless.
 
 It's currently providing parallelism through python threads and is
@@ -108,7 +108,7 @@ class SimpleUrlDownloader(Pipeline):
     steps = [Download, Cache]
 ```
 
-### Running and feeding
+### Running a pipeline in foreground
 
 ```bash
 lineup downloader run --output=rpush@example-output
@@ -116,8 +116,32 @@ lineup downloader run --output=rpush@example-output
 
 ![example/run.png](example/run.png)
 
+
+### Feeding a pipeline through command line
+
 ```bash
 lineup downloader push {"url": "http://github.com/gabrielfalcao.keys"}
+```
+
+### Feeding a pipeline programatically
+
+```python
+from lineup import JSONRedisBackend
+from example.pipelines import SimpleUrlDownloader
+
+pipeline = SimpleUrlDownloader(JSONRedisBackend)
+pipeline.input.put({
+    "url": "http://github.com/gabrielfalcao.keys"
+})
+```
+
+### Stopping all running pipelines
+
+This broadcasts a "stop" signal in the backend.
+
+
+```bash
+lineup downloader stop
 ```
 
 
@@ -136,5 +160,3 @@ curd install -r development.txt
 ```bash
 make test
 ```
-
-[![instanc.es Badge](https://instanc.es/bin/gabrielfalcao/lineup.png)](http://instanc.es)
