@@ -46,7 +46,7 @@ class JSONRedisBackend(BaseBackend):
             host=conf.host,
             port=conf.port,
             # using `path` as password to support the URI like:
-            # redis://dbindex@hostname:port/veryverylongpasswordhashireallymeanSHA512
+            # redis://dbindex@hostname:port/veryverylongpasswordhash
             password=conf.path,
         )
 

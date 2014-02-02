@@ -42,8 +42,9 @@ class Command(object):
 
         found = choices.get(name)
         if not found:
-            raise CLIError('No such pipeline: \033[1;33m{0}\033[0m, options '
-                           'are: \033[1;32m{1}\033[0m'.format(name, b", ".join(choices.keys())))
+            msg = ('No such pipeline: \033[1;33m{0}\033[0m, options '
+                   'are: \033[1;32m{1}\033[0m')
+            raise CLIError(msg.format(name, b", ".join(choices.keys())))
 
         return choices[name]
 

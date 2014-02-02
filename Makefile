@@ -5,7 +5,7 @@ export PYTHONPATH:=${PWD}:$$PYTHONPATH
 # </variables>
 
 EXTRA_TEST_TASKS=
-all: test
+all: lint test
 
 filename=lineup-`python -c 'import lineup.version;print lineup.version.version'`.tar.gz
 

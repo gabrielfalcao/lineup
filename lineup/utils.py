@@ -32,7 +32,8 @@ class PipelineScanner(object):
             try:
                 found.append(imp.load_source(module_name, node.path))
             except (ImportError, SystemError):
-                logger.exception("Failed to import \033[1;33m%s\033[0m", str(node.path))
+                msg = "Failed to import \033[1;33m%s\033[0m"
+                logger.exception(msg, str(node.path))
 
         return found
 
