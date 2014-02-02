@@ -53,4 +53,5 @@ clean:
 
 release: test
 	@./.release
+	@pandoc -o readme.rst README.md
 	@python setup.py sdist register upload
