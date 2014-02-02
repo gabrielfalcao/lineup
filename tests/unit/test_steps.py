@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
+import re
 import mock
 from mock import Mock, patch, call
 from lineup.core import LineUpKeyError
 from lineup.steps import Step, KeyMaker
+
+nopyc = lambda x:re.sub(r'py[cao]$', 'py', x)
 
 
 class TestStep(Step):
@@ -471,7 +474,7 @@ def test_step_loop_upon_exception():
 
     MyStep.do_consume.assert_called_once_with('instructions')
     MyStep.handle_exception.assert_called_once_with(
-        exc, 'instructions')
+        nopyc(mock.__file__), 'instructions')
 
     stack.should.equal([
         ('before_consume', (step,), {}),
@@ -512,6 +515,6 @@ def test_step_loop_upon_lineup_key_error(logger):
     logger.error.assert_has_calls([
         call('LineUpKeyError:\n%s\n\033[1;33mIn file %s line %s\033[0m\n',
              exc,
-             mock.__file__, 958),
+             nopyc(mock.__file__), 958),
         call(u'The send data was lost: \033[1;33m%s\033[0m', u'instructions'),
     ])
