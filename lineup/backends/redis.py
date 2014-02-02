@@ -26,15 +26,26 @@
 
 from __future__ import unicode_literals, absolute_import
 import json
+from milieu import Environment
 
 from lineup.backends.base import BaseBackend, io_operation
 
 from redis import StrictRedis
 
+env = Environment()
+
 
 class JSONRedisBackend(BaseBackend):
     def initialize(self):
-        self.redis = StrictRedis()
+        conf = env.get_uri("LINEUP_REDIS_URI")
+        self.redis = StrictRedis(
+            db=conf.user or 0,
+            host=conf.host,
+            port=conf.port,
+            # using `path` as password to support the URI like:
+            # redis://dbindex@hostname:port/veryverylongpasswordhashireallymeanSHA512
+            password=conf.path,
+        )
 
     def serialize(self, value):
         return json.dumps(value)
