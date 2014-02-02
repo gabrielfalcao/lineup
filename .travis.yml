@@ -18,7 +18,7 @@ cache:
 
 install:
   - pip install curdling flake8
-  - curd install -r requirements.txt
+  - curd install -r development.txt
 
 script:
   - make $TEST_TYPE
