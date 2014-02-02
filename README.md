@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/weedlabs/lineup.png)](https://travis-ci.org/weedlabs/lineup)
+[![Build Status](https://travis-ci.org/weedlabs/lineup.png?branch=master)](https://travis-ci.org/weedlabs/lineup)
 # LineUp - Distributed Pipeline Framework for Python
 
 Lineup is a redis-based
