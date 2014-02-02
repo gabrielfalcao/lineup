@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
-from mock import patch, Mock
-from lineup.backends.base import BaseBackend, io_operation
+
+from lineup.backends.base import BaseBackend
 
 
 def test_get_name():
@@ -20,6 +20,7 @@ def test_get_name():
 
     # Then it should be the class name
     result.should.equal("MyBackend")
+
 
 def test_repr():
     ("BaseBackend#repr should return class name by default")

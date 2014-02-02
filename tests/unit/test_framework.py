@@ -122,8 +122,6 @@ def test_node_feed():
     # Then it should have started each worker
     node.input.put.assert_called_once_with({'an': 'item'})
 
-    node.run_daemon.assert_called_once_with()
-
 
 def test_node_stop():
     ("Node#stop should stop all workers")
@@ -281,7 +279,7 @@ def test_pipeline_make_queue(Queue):
 
     # And Queue should have been called appropriately
     Queue.assert_called_once_with(
-        'tests.unit.test_framework.TestPipeline.queue.42',
+        'test-pipeline.queue.42',
         backend_class=TestBackend,
         timeout='forever')
 

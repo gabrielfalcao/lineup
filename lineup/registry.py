@@ -3,7 +3,6 @@
 #
 from __future__ import unicode_literals
 
-from plant import DotDict
 from collections import defaultdict
 
-BY_KIND = defaultdict(DotDict)
+BY_KIND = defaultdict(dict)

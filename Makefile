@@ -1,15 +1,13 @@
 # <variables>
 PACKAGE=lineup  # the python module name
 TESTS_VERBOSITY=2
-export PYTHONPATH=$(pwd)
+export PYTHONPATH:=${PWD}:$$PYTHONPATH
 # </variables>
 
 EXTRA_TEST_TASKS=
 all: test
 
 filename=lineup-`python -c 'import lineup.version;print lineup.version.version'`.tar.gz
-
-export PYTHONPATH:=  ${PWD}
 
 test: unit functional
 run_test:
@@ -40,6 +38,7 @@ acceptance:
 	@steadymark docs/*.md
 
 docs: clean
+	env
 	@steadymark docs/*.md
 	@git co master && \
 		(git br -D gh-pages || printf "") && \

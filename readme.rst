@@ -1,11 +1,8 @@
-Lineup: Distributed Pipeline Framework for Python
+|Build Status| # LineUp - Distributed Pipeline Framework for Python
 
-
-. image:: https://travis-ci.org/gabrielfalcao/lineup.png
-
-Lineup is a redis-based `pipeline
-<http://en.wikipedia.org/wiki/Pipeline\_(software)>`_ framework that
-turns horizontal scalling seamless.
+Lineup is a redis-based
+`pipeline <http://en.wikipedia.org/wiki/Pipeline_(software)>`__
+framework that turns horizontal scalling seamless.
 
 It's currently providing parallelism through python threads and is
 pretty useful for writing systems where the workers make lots of network
@@ -36,62 +33,66 @@ Defining steps
 Steps must always implement the method ``consume(self, instructions)``
 and always call ``self.produce()`` with it's portion of work.
 
+Example: Downloader with local cache
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. code:: python
 
+    # myapp/workers.py
 
-    # myapp/tasks.py
+    import re
+    import codecs
+    import requests
 
     from lineup import Step
 
-    import requests
 
-    class Scraper(Step):
-        def consume(self):
-            url = instructions['url']
-            response = requests.get(url)
+    class Download(Step):
+        def after_consume(self, instructions):
+            self.log(
+                "Done downloading %s",
+                instructions['url'],
+            )
 
-            # pretend you generated a
-            # list of things or general
-            # metadata
-
-            results = [
-                'https://2.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-                'https://1.gravatar.com/avatar/b9aa05d9efc6a3c8eda50f7763ad0715'
-                'https://0.gravatar.com/avatar/605d445205b61ec11185a28dc4ab9323'
-                'https://0.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-                'https://1.gravatar.com/avatar/666e2844d622f8714e8ccf8ffb48a47c'
-                'https://0.gravatar.com/avatar/29701ae503ec7d9e670edaf095503067'
-                'https://2.gravatar.com/avatar/605d445205b61ec11185a28dc4ab9323'
-                'https://2.gravatar.com/avatar/68edef29d4c6826af22d6fcbbf8f1084'
-            ]
-
-            self.produce({
-                'images-to-download': results,
-            })
-
-
-    class Downloader(Step):
-        import re
-
-        def make_filename(self, index):
-            original_url = self.payload['initial']['url']
-            slug = re.sub(r'\W+', '-', original_url)
-            return ".".join([slug.strip('-'), index,'.png'])
+        def before_consume(self):
+            self.log("The downloader is ready")
 
         def consume(self, instructions):
-            images_to_download = instructions['images-to-download']
-            filenames = []
-            for index, image in enumerate(images_to_download):
-                filename = self.make_filename(index)
-                response = requests.get(image)
+            url = instructions['url']
+            method = instructions.get('method', 'get').lower()
 
-                with open(filename) as f:
-                    f.write(response.content)
-                    filenames.append(filename)
+            http_request = getattr(requests, method)
+            response = http_request(url)
+            instructions['download'] = {
+                'content': response.content,
+                'headers': dict(response.headers),
+                'status_code': response.status_code,
+            }
+            self.produce(instructions)
 
-            self.produce({
-                'filenames': filenames
-            })
+
+    class Cache(Step):
+        def after_consume(self, instructions):
+            self.log("Done caching %s", instructions.keys())
+
+        def before_consume(self):
+            self.log("The cacher is also ready")
+
+        def get_slug(self, url):
+            url = re.sub(r'^https?://', '', url)
+            url = re.sub(r'\W+', '-', url)
+            return url
+
+        def consume(self, instructions):
+            url = instructions['url']
+            name = self.get_slug(url)
+            with codecs.open(name, 'wb', 'utf-8') as fd:
+                fd.write(instructions['download']['content'])
+                fd.close()
+                instructions['cached_at'] = {
+                    'filename': fd.name,
+                }
+            self.produce(instructions)
 
 Defining pipelines
 ~~~~~~~~~~~~~~~~~~
@@ -101,22 +102,68 @@ Defining pipelines
     # myapp/pipelines.py
 
     from lineup import Pipeline
-    from myapp.steps import Scraper, Downloader
+    from example.workers import Download, Cache
 
-    class GravatarScraping(Pipeline):
-        name = 'gravatars-from-github'
 
-        steps = [
-            Scraper,
-            Downloader
-        ]
+    class SimpleUrlDownloader(Pipeline):
+        name = 'downloader'
+        steps = [Download, Cache]
 
-Running
-~~~~~~~
+Command line
+------------
+
+When running from the command line, lineup will recursively try to
+import all python files given as ``--working-dir`` argument, which
+defaults to the relative equivalent to ``os.getcwd()``.
+
+In other words it will find your stuff automatically in dir you run the
+pipeline from, or from the ``--working-dir`` arg.
+
+Type ``lineup --help`` for more info.
+
+Running a pipeline in foreground
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: bash
 
-    lineup gravatars-from-github {'url': 'https://github.com/trending/developers'}
+    lineup downloader run --output=rpush@example-output
+
+.. figure:: example/run.png
+   :alt: example/run.png
+
+   example/run.png
+Feeding a pipeline through command line
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code:: bash
+
+    lineup downloader push {"url": "http://github.com/gabrielfalcao.keys"}
+
+.. figure:: example/push.png
+   :alt: example/run.png
+
+   example/run.png
+Feeding a pipeline programatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code:: python
+
+    from lineup import JSONRedisBackend
+    from example.pipelines import SimpleUrlDownloader
+
+    pipeline = SimpleUrlDownloader(JSONRedisBackend)
+    pipeline.input.put({
+        "url": "http://github.com/gabrielfalcao.keys"
+    })
+
+Stopping all running pipelines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This broadcasts a "stop" signal in the backend.
+
+.. code:: bash
+
+    lineup downloader stop
 
 Contributing
 ------------
@@ -135,9 +182,5 @@ Run tests
 
     make test
 
-|instanc.es Badge|
-
-.. |Build Status| image:: https://travis-ci.org/gabrielfalcao/lineup.png
-   :target: https://travis-ci.org/gabrielfalcao/lineup
-.. |instanc.es Badge| image:: https://instanc.es/bin/gabrielfalcao/lineup.png
-   :target: http://instanc.es
+.. |Build Status| image:: https://travis-ci.org/weedlabs/lineup.png
+   :target: https://travis-ci.org/weedlabs/lineup

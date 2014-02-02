@@ -99,8 +99,7 @@ class Pipeline(Node):
 
     def make_queue(self, index):
         name = '.'.join([
-            self.__class__.__module__,
-            self.__class__.__name__,
+            self.name,
             b'queue',
             str(index),
         ])

@@ -2,8 +2,11 @@
 # -*- coding: utf-8 -*-
 #
 from __future__ import unicode_literals
+import mock
 from mock import Mock, patch, call
+from lineup.core import LineUpKeyError
 from lineup.steps import Step, KeyMaker
+
 
 class TestStep(Step):
     def __init__(self):
@@ -12,12 +15,13 @@ class TestStep(Step):
     def __repr__(self):
         return self.__class__.__name__
 
+
 def test_key_maker():
     ("KeyMaker should make keys for logging, alive and error")
 
     # Given a fake step that has a name
     step = Mock()
-    step.name='coolbabe'
+    step.name = 'coolbabe'
 
     # When I create a KeyMaker for that step
     km = KeyMaker(step)
@@ -59,13 +63,10 @@ def test_step_manages_to_get_adopted(logging, KeyMaker, Event):
 
     KeyMaker.assert_called_once_with(step)
 
-    step.logger.should.equal(logging.getLogger.return_value)
-    logging.getLogger.assert_called_once_with(
-        KeyMaker.return_value.logging)
-
 
 def test_step_get_name():
     ("Step get_name")
+
     class MyStep(Step):
         pass
 
@@ -80,6 +81,7 @@ def test_step_get_name():
 
 def test_step_as_repr():
     ("repr(Step) should return its ancestry")
+
     class MyStep(Step):
         pass
 
@@ -97,6 +99,7 @@ def test_step_as_repr():
 
 def test_step_as_id():
     ("id(Step) should return its ancestry")
+
     class MyStep(Step):
         ancestry = 'this is the ancestry'
         ident = 'identity'
@@ -129,13 +132,12 @@ def test_step_log(logging, time, KeyMaker):
     parent = Mock(name='parent')
     backend = parent.get_backend.return_value
 
-
     class FooStep(Step):
         def consume(self, instructions):
             self.produce(instructions)
 
     step = FooStep(consumer, producer, parent)
-    step.log("Mensagem %s", "arg1", foo="bar")
+    step.log("Mensagem %s", "arg1")
     backend.rpush.assert_called_once_with(
         'step_key_for_logging', {
             'message': 'Mensagem arg1',
@@ -191,8 +193,6 @@ def test_step_produce():
 def test_step_before_consume(logging):
     ("Step#before_consume by default just logs")
 
-    logger = logging.getLogger.return_value
-
     # Given a consumer queue
     consumer_queue = Mock(name='consumer_queue')
 
@@ -201,6 +201,7 @@ def test_step_before_consume(logging):
 
     # And a manager
     parent = Mock(name='parent')
+    parent.get_name.return_value = 'parent_queue'
 
     # And a step that implements consume
     class CoolStep(Step):
@@ -212,15 +213,14 @@ def test_step_before_consume(logging):
     step.before_consume()
 
     CoolStep.log.assert_has_calls([
-        call("%s is about to consume its queue", step),
+        call("%s is about to consume its queue",
+             'tests.unit.test_steps.CoolStep'),
     ])
 
 
 @patch("lineup.steps.logging")
 def test_step_after_consume(logging):
     ("Step#after_consume by default just logs")
-
-    logger = logging.getLogger.return_value
 
     # Given a consumer queue
     consumer_queue = Mock(name='consumer_queue')
@@ -243,12 +243,13 @@ def test_step_after_consume(logging):
     })
 
     CoolStep.log.assert_has_calls([
-        call("%s is done", step),
+        call("%s is done",
+             'tests.unit.test_steps.CoolStep'),
     ])
 
 
 def test_step_do_rollback():
-    ("Step#do_rollback should call consume")
+    ("Step#do_rollback should call rollback")
 
     # Given a consumer queue
     consumer_queue = Mock(name='consumer_queue')
@@ -264,13 +265,56 @@ def test_step_do_rollback():
     step = CoolStep(consumer_queue, producer_queue, parent)
     step.do_rollback({'instructions': True})
 
-    CoolStep.rollback.assert_called_once_with(
+    CoolStep.rollback.assert_has_calls([
+        call({'instructions': True}),
+    ])
+
+
+@patch('lineup.steps.logger')
+@patch('lineup.steps.sys.exc_info')
+@patch('lineup.steps.Step.log_key_error')
+def test_step_do_rollback_failed_exception(
+        log_key_error, exc_info, logger):
+    ("Step#do_rollback should handle LineUpKeyError")
+
+    traceback = Mock(name='traceback')
+    exc_info.return_value = [traceback]
+
+    # Given a consumer queue
+    consumer_queue = Mock(name='consumer_queue')
+
+    # And a producer queue
+    producer_queue = Mock(name='producer_queue')
+
+    # And a manager
+    parent = Mock(name='parent')
+
+    # And an exception
+    boom = ValueError('boom')
+
+    # And a step that implements consume
+    class CoolStep(Step):
+        rollback = Mock(name='CoolStep.rollback',
+                        side_effect=boom)
+        produce = Mock(name='CoolStep.produce')
+
+    step = CoolStep(consumer_queue, producer_queue, parent)
+    step.do_rollback({'instructions': True})
+
+    logger.exception.assert_called_once_with(
+        'Failed to rollback %s:\n\n%s\n',
+        b'tests.unit.test_steps.CoolStep',
         {'instructions': True})
+
+    CoolStep.produce.assert_called_once_with({
+        'instructions': True,
+    })
 
 
 @patch("lineup.steps.Event")
 def test_step_stop(Event):
     ("Step stop should set the ready event")
+
     class MyStep(Step):
         pass
 
@@ -317,12 +361,12 @@ def test_step_rollback():
     step = Step(consumer_queue, producer_queue, parent)
     step.rollback({'instructions': True})
 
-    consumer_queue.put.assert_called_once_with(
-        {'instructions': True})
+    consumer_queue.put.called.should.be.false
 
 
+@patch("lineup.steps.logging.getLogger")
 @patch('lineup.steps.traceback')
-def test_step_handle_exception(traceback):
+def test_step_handle_exception(traceback, getLogger):
     ("Step#handle_exception should log thre traceback, "
      "forward the instructions")
 
@@ -345,17 +389,9 @@ def test_step_handle_exception(traceback):
     step.handle_exception(
         my_exception, {'some': 'instructions'})
 
-    MyStep.log.assert_called_once_with(
-        'the infamous traceback')
+    MyStep.log.called.should.be.false
 
-    MyStep.produce.assert_called_once_with({
-        u'some': u'instructions',
-        u'__lineup__error__': {
-            u'consume_queue_size': u'# consumers',
-            u'produce_queue_size': u'# producers',
-            u'traceback': u'the infamous traceback',
-        }
-    })
+    MyStep.produce.called.should.be.false
 
 
 def test_step_run():
@@ -380,8 +416,8 @@ def test_step_loop():
     ("Step#loop should trigger events of before/after "
      "consume, then consume queue and ensure its lifecycle")
 
-
     stack = []
+
     register = lambda name: lambda *args, **kw: stack.append(
         (name, args, kw))
 
@@ -398,7 +434,6 @@ def test_step_loop():
 
     step.loop()
 
-
     MyStep.do_consume.assert_called_once_with('instructions')
 
     stack.should.equal([
@@ -411,8 +446,8 @@ def test_step_loop():
 def test_step_loop_upon_exception():
     ("Step#loop should call handle_exception if it happens")
 
-
     stack = []
+
     register = lambda name: lambda *args, **kw: stack.append(
         (name, args, kw))
 
@@ -424,7 +459,6 @@ def test_step_loop_upon_exception():
         consume_queue = Mock(name='consume_queue')
         do_consume = Mock(name='MyStep.do_consume')
         handle_exception = Mock(name='MyStep.handle_exception')
-
 
     exc = ValueError('BOOM')
     MyStep.do_consume.side_effect = exc
@@ -443,4 +477,41 @@ def test_step_loop_upon_exception():
         ('before_consume', (step,), {}),
         ('ready.clear()', (), {}),
         ('after_consume', (step, 'instructions'), {})
+    ])
+
+
+@patch('lineup.steps.logger')
+def test_step_loop_upon_lineup_key_error(logger):
+    ("Step#loop should log a LineUpKeyError gracefully "
+     "showing the failed file and line number")
+
+    stack = []
+
+    register = lambda name: lambda *args, **kw: stack.append(
+        (name, args, kw))
+
+    class MyStep(TestStep):
+        before_consume = register('before_consume')
+        after_consume = register('after_consume')
+
+        ready = Mock(name='MyStep.ready')
+        consume_queue = Mock(name='consume_queue')
+        do_consume = Mock(name='MyStep.do_consume')
+        handle_exception = Mock(name='MyStep.handle_exception')
+
+    exc = LineUpKeyError('missing ma booty')
+    MyStep.do_consume.side_effect = exc
+
+    MyStep.ready.clear = register('ready.clear()')
+    step = MyStep()
+    MyStep.consume_queue.get.return_value = 'instructions'
+
+    step.loop()
+
+    MyStep.do_consume.assert_called_once_with('instructions')
+    logger.error.assert_has_calls([
+        call('LineUpKeyError:\n%s\n\033[1;33mIn file %s line %s\033[0m\n',
+             exc,
+             mock.__file__, 958),
+        call(u'The send data was lost: \033[1;33m%s\033[0m', u'instructions'),
     ])

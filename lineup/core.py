@@ -17,6 +17,10 @@ class Registry(type):
         super(Registry, cls).__init__(name, bases, attrs)
 
     @classmethod
+    def clear(cls):
+        registry.BY_KIND.clear()
+
+    @classmethod
     def pipelines_by_name(cls):
         return registry.BY_KIND['pipeline']
 
@@ -30,6 +34,13 @@ class LineUpKeyError(KeyError):
 
 
 class LineUpPayloadDict(dict):
+    # # TODO
+    # def get(self, key, fallback=None):
+    #     value = super(LineUpPayloadDict, self).get(key, fallback)
+    #     if isinstance(value, dict):
+    #         value = LineUpPayloadDict(value)
+    #     return value
+
     def __getitem__(self, key, *args):
         try:
             value = super(LineUpPayloadDict, self).__getitem__(key, *args)

@@ -31,7 +31,7 @@ def test_pipeline_should_stop_upon_sigint(sys):
     pipeline.started.should.be.true
 
     pipeline.feed({'cool': 'yeah'})
-
+    pipeline.stop()
     pipeline.handle_control_c(signal.SIGINT, None)
     sys.exit.assert_called_once_with(1)
 

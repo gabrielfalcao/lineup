@@ -1,4 +1,4 @@
-# #!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # <lineup - python distributed pipeline framework>
 # Copyright (C) <2013>  Gabriel Falcão <gabriel@nacaolivre.org>

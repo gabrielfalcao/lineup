@@ -43,6 +43,7 @@ def test_queue_adopt_producer_step(context):
     repr(q1).should.equal(
         '<lineup.Queue(lineup:name1, backend=<JSONRedisBackend>)>')
 
+
 @redis_test
 def test_pipeline(context):
     ("Pipeline should process steps")
@@ -62,14 +63,14 @@ def test_pipeline(context):
         steps = [OkStep, SaveStep]
 
     manager = OkFooBar(JSONRedisBackend)
+    manager.run_daemon()
     manager.feed({'foo': 'Bar'})
 
-    result= manager.get_result()
+    result = manager.get_result()
     manager.stop()
 
     result.should.equal({"SAVED": {'ok': {'foo': 'Bar'}}})
     context.redis.get("WORKED").should.equal("YES")
-
 
 
 @redis_test
@@ -81,6 +82,9 @@ def test_pipeline_exception(context):
             self.produce({'cool': instructions})
 
     class BoomStep(Step):
+        def rollback(self, instructions):
+            self.produce(instructions)
+
         def consume(self, instructions):
             raise ValueError("BOOM")
 
@@ -89,9 +93,11 @@ def test_pipeline_exception(context):
         steps = [CoolStep, BoomStep]
 
     manager = CoolFooBar(JSONRedisBackend)
+    manager.run_daemon()
+    manager.run_daemon()
     manager.feed({'foo': 'Bar'})
 
-    result= manager.get_result()
+    result = manager.get_result()
     manager.stop()
 
     result.should.be.a(dict)
@@ -104,7 +110,7 @@ def test_pipeline_exception(context):
 
 @redis_test
 def test_pipeline_exception_bad_rollback(context):
-    ("Pipeline should handle exceptions")
+    ("Pipeline should handle a bad rollback")
 
     class AwesomeStep(Step):
         def consume(self, instructions):
@@ -115,16 +121,17 @@ def test_pipeline_exception_bad_rollback(context):
             raise ValueError("BOOM")
 
         def rollback(self, instructions):
-            ValueError("ROLLBACK HELL")
+            raise ValueError("ROLLBACK HELL")
 
     class AwesomeFooBar(Pipeline):
-        name = 'awesomefoobar'
+        name = 'awesomefoobar3'
         steps = [AwesomeStep, BoomStep]
 
     manager = AwesomeFooBar(JSONRedisBackend)
+    manager.run_daemon()
     manager.feed({'foo': 'Bar'})
 
-    result= manager.get_result()
+    result = manager.get_result()
     manager.stop()
 
     result.should.be.a(dict)
@@ -133,3 +140,64 @@ def test_pipeline_exception_bad_rollback(context):
     result['__lineup__error__']['traceback'].should.contain("ValueError: BOOM")
     result['__lineup__error__']['consume_queue_size'].should.equal(0)
     result['__lineup__error__']['produce_queue_size'].should.equal(0)
+
+
+@redis_test
+def test_pipeline_exception_key_error(context):
+    ("Pipeline should handle key error")
+
+    class AwesomeStep(Step):
+        def consume(self, instructions):
+            instructions['awesome'] = True
+            self.produce(instructions)
+
+    class StatusBoom(Step):
+        def consume(self, instructions):
+            self.produce(instructions['nah'])
+
+        def rollback(self, instructions):
+            self.produce({"status": "it's all good", "backup": instructions})
+
+    class AwesomeFooBar(Pipeline):
+        name = 'awesomefoobar4'
+        steps = [AwesomeStep, StatusBoom]
+
+    manager = AwesomeFooBar(JSONRedisBackend)
+    manager.run_daemon()
+    manager.feed({'foo': 'Bar'})
+
+    result = manager.get_result()
+    manager.stop()
+
+    result.should.equal({
+        u'backup': {
+            u'awesome': True, u'foo': u'Bar'}, u'status': u"it's all good"})
+
+
+@redis_test
+def test_pipeline_default_rollback(context):
+    ("Step has a default rollback")
+
+    class BoomStep(Step):
+        def consume(self, instructions):
+            if instructions['failpurposedly']:
+                raise ValueError("BOOM")
+
+            self.produce({'ok': True})
+
+    class CoolFooBar(Pipeline):
+        name = 'coolfoobar2'
+        steps = [BoomStep]
+
+    manager = CoolFooBar(JSONRedisBackend)
+    manager.run_daemon()
+    manager.run_daemon()
+    manager.feed({'failpurposedly': True})
+    manager.feed({'failpurposedly': False})
+
+    result = manager.get_result()
+    manager.stop()
+
+    result.should.equal({
+        'ok': True,
+    })

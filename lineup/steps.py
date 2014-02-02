@@ -88,7 +88,16 @@ class Step(Thread):
         self.log("%s is done", self.name)
 
     def do_rollback(self, instructions):
-        self.rollback(instructions)
+        try:
+            self.rollback(instructions)
+
+        except Exception:
+            self.produce(instructions)
+            logger.exception(
+                "Failed to rollback %s:\n\n%s\n",
+                self.name,
+                instructions,
+            )
 
     def rollback(self, instructions):
         logger.error(
@@ -107,6 +116,17 @@ class Step(Thread):
         while self.is_active():
             self.loop()
 
+    def log_key_error(self, exc, tb):
+        filename = tb.tb_frame.f_code.co_filename
+        lineno = tb.tb_frame.f_code.co_firstlineno
+        message = (
+            "LineUpKeyError:\n%s\n\033[1;33m"
+            "In file %s line %s\033[0m\n"
+        )
+
+        logger.error(message,
+                     exc, filename, lineno)
+
     def loop(self):
         self.before_consume()
 
@@ -116,15 +136,8 @@ class Step(Thread):
             self.do_consume(instructions)
         except LineUpKeyError as e:
             tb = sys.exc_info()[-1].tb_next.tb_next
-            filename = tb.tb_frame.f_code.co_filename
-            lineno = tb.tb_frame.f_code.co_firstlineno
-            message = (
-                "LineUpKeyError:\n%s\n\033[1;33m"
-                "In file %s line %s\033[0m\n"
-            )
-
-            logger.error(message,
-                         e, filename, lineno)
+            self.log_key_error(e, tb)
+            self.rollback(instructions)
 
         except Exception as e:
             self.handle_exception(e, instructions)
