@@ -89,6 +89,7 @@ class RedisOutputProxy(object):
     def __init__(self, pipeline, directive, key):
         self.pipeline = pipeline
         self.key = key
+
         self.backend = self.backend_class()
         self.directive = getattr(self.backend, directive)
         self.status_key = ':'.join(

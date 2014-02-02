@@ -34,7 +34,7 @@ from lineup.backends.base import BaseBackend, io_operation
 from redis import StrictRedis
 
 env = Environment()
-os.environ.setdefault('LINEUP_REDIS_URI', 'redis://1@localhost:6379')
+os.environ.setdefault('LINEUP_REDIS_URI', 'redis://0@localhost:6379')
 
 
 class JSONRedisBackend(BaseBackend):

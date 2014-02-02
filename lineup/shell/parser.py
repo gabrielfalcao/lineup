@@ -55,6 +55,12 @@ def main():
         help='What pipeline to work with',
     )
 
+    rargs = parser.parse_known_args()[0]
+    if rargs.pipeline_name:
+        pipeline_name = rargs.pipeline_name[0]
+    else:
+        pipeline_name = 'UNKNOWN'
+
     subparsers = parser.add_subparsers()
 
     push = subparsers.add_parser(
@@ -84,7 +90,7 @@ def main():
     run.add_argument('--output',
                      metavar='OUTPUT_URI',
                      type=str,
-                     default='rpush@done',
+                     default='rpush@{0}-done'.format(pipeline_name),
                      help=('Output to a given list'),
     )
 
@@ -94,7 +100,7 @@ def main():
     stop.add_argument('--output',
                      metavar='OUTPUT_URI',
                      type=str,
-                     default='rpush@done',
+                     default='rpush@{0}-done'.format(pipeline_name),
                      help=('Output to a given list'),
     )
 
