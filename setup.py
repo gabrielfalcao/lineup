@@ -97,7 +97,7 @@ if __name__ == '__main__':
         include_package_data=True,
         entry_points={
             'console_scripts': [
-                'lineup = lineup.cli:main',
+                'lineup = lineup.cli:run_cli',
             ]
         },
         classifiers=[
