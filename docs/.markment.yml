@@ -1,10 +1,10 @@
 project:
   name: LineUp
   version: 0.1.1
-  github_maintainer: gabrielfalcao
+  github_maintainer: weedlabs
   description: Distributed pipeline framework for python
-  github_url: http://github.com/gabrielfalcao/lineup
-  tarball_download_url: https://github.com/gabrielfalcao/lineup/archive/master.tar.gz
+  github_url: http://github.com/weedlabs/lineup
+  tarball_download_url: https://github.com/weedlabs/lineup/archive/master.tar.gz
 
 documentation:
   index: intro.md
