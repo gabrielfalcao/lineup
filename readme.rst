@@ -178,5 +178,5 @@ Run tests
 
     make test
 
-.. |Build Status| image:: https://travis-ci.org/weedlabs/lineup.png
+.. |Build Status| image:: https://travis-ci.org/weedlabs/lineup.png?branch=master
    :target: https://travis-ci.org/weedlabs/lineup
