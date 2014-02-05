@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
+import os
 import sys
 import json
 import logging
 import coloredlogs
+
 from lineup import JSONRedisBackend
 
 from lineup.utils import PipelineScanner
@@ -19,6 +21,7 @@ class CLIError(Exception):
 
 class Command(object):
     def __init__(self, root_parser, sub_parser):
+        sys.path.append(os.getcwd())
         self.root_parser = root_parser
         self.sub_parser = sub_parser
         self.args = self.root_parser.parse_known_args()[0]
