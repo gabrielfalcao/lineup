@@ -74,9 +74,11 @@ def parse_requirements(path):
     return pkgs, links
 
 
-local_file = lambda *f: \
-    open(os.path.join(os.path.dirname(__file__), *f)).read()
-
+def local_file(*f):
+    try:
+        return open(os.path.join(os.path.dirname(__file__), *f)).read()
+    except:
+        return ''
 
 install_requires, dependency_links = \
     parse_requirements('requirements.txt')
