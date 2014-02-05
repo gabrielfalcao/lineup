@@ -10,6 +10,15 @@ the `LINEUP_REDIS_URI` environment variable has the syntax: `redis://<dbindex>@<
 export LINEUP_REDIS_URI='redis://15@localhost:6379'
 ```
 
+## Listing available pipelines
+
+LineUp scans the given working directory recursively for pipeline class declarations,
+here is how you can list all the pipelines that lineup can find:
+
+```bash
+lineup list pipelines
+```
+
 ## An example production setup
 
 ```bash

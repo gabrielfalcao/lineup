@@ -16,6 +16,7 @@ from lineup.shell.commands import (
     RunPipeline,
     StopPipeline,
     PushToPipeline,
+    PipelinesCmd,
 )
 
 
@@ -103,11 +104,14 @@ def main():
                      default='rpush@{0}-done'.format(pipeline_name),
                      help=('Output to a given list'),
     )
+    pipelines = subparsers.add_parser(
+        'pipelines', help='Special command for handling pipelines')
 
     Command.execute_from_root_parser(parser, subparsers=[
         ('run', run, RunPipeline),
         ('stop', stop, StopPipeline),
         ('push', push, PushToPipeline),
+        ('pipelines', pipelines, PipelinesCmd),
     ])
 
 

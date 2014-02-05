@@ -113,6 +113,15 @@ the pipeline from, or from the `--working-dir` arg.
 Type `lineup --help` for more info.
 
 
+### Listing available pipelines
+
+LineUp scans the given working directory recursively for pipeline class declarations,
+here is how you can list all the pipelines that lineup can find:
+
+```bash
+lineup list pipelines
+```
+
 ### Running a pipeline in foreground
 
 ```bash

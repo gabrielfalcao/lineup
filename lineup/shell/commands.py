@@ -160,3 +160,28 @@ class PushToPipeline(Command):
         data = self.get_json_data(arguments)
         for item in data:
             self.pipeline.feed(item)
+
+
+class PipelinesCmd(Command):
+    name = 'pipelines'
+
+    pipeline = None
+
+    def when_executed(self, arguments, remainder):
+        # confusing but true, as result of:
+        # lineup list pipelines:
+        command = self.args.pipeline_name[0]
+
+        method = getattr(self, 'do_{0}'.format(command), None)
+        if method:
+            return method(arguments, remainder)
+
+        else:
+            msg = "Invalid pipeline command: {0}"
+            raise CLIError(msg.format(command))
+
+    def do_list(self, arguments, remainder):
+        cwd = os.path.abspath(self.args.working_dir)
+        print "\033[1;32mLine\033[0;30mUp\033[0m at \033[1;33m{0}\033[0m:".format(cwd)
+        for name in self.scanner.get_pipelines().keys():
+            print " -\033[1;32m", name, "\033[0m"
