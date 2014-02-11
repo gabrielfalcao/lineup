@@ -25,7 +25,7 @@ run_test:
 		fi \
 	fi
 
-unit:
+unit: lint
 	@make run_test suite=unit
 
 functional:

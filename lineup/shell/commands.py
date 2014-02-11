@@ -181,7 +181,8 @@ class PipelinesCmd(Command):
             raise CLIError(msg.format(command))
 
     def do_list(self, arguments, remainder):
+        banner = "\033[1;32mLine\033[0;30mUp\033[0m at \033[1;33m{0}\033[0m:"
         cwd = os.path.abspath(self.args.working_dir)
-        print "\033[1;32mLine\033[0;30mUp\033[0m at \033[1;33m{0}\033[0m:".format(cwd)
+        print banner.format(cwd)
         for name in self.scanner.get_pipelines().keys():
             print " -\033[1;32m", name, "\033[0m"
