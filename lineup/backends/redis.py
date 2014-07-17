@@ -25,7 +25,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals, absolute_import
+
 import os
+import time
 import json
 from milieu import Environment
 
@@ -120,3 +122,37 @@ class JSONRedisBackend(BaseBackend):
         all_producers = result[-1]
 
         return all_consumers, all_producers
+
+    @io_operation
+    def enqueue(self, queue_name, payload):
+        product = self.serialize(payload)
+        pipeline = self.redis.pipeline()
+        transpose_key = ':'.join([queue_name, 'transposition'])
+
+        pipeline.rpush(queue_name, product)
+        pipeline.hmset(
+            transpose_key,
+            "payload",
+            product,
+            "enqueued_at",
+            time.time()
+        )
+
+        result = pipeline.execute()
+        return result
+
+    @io_operation
+    def borrow(self, queue_name):
+
+        pipeline = self.redis.pipeline()
+        transpose_key = ':'.join([queue_name, 'transposition'])
+
+        pipeline.rpush(queue_name, product)
+        pipeline.hmset(
+            transpose_key,
+            "borrowed_at",
+            time.time()
+        )
+
+        result = pipeline.execute()
+        return result
