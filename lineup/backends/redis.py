@@ -32,12 +32,28 @@ import json
 from itertools import izip
 from milieu import Environment
 
-from lineup.backends.base import BaseBackend
+from lineup.backends.base import BaseBackend, io_operation
 
 from redis import StrictRedis
 
 env = Environment()
 os.environ.setdefault('LINEUP_REDIS_URI', 'redis://0@localhost:6379')
+
+put_lua_script = '''
+local first_item_key = KEYS[1]
+local idle_items_key = KEYS[2]
+local given_item_key = KEYS[3]
+
+local uuid = ARGV[1]
+local data = ARGV[2]
+
+redis.call("HMSET", given_item_key, "uuid", uuid, "data", data, "status", "idle")
+redis.call("LPUSH", idle_items_key, given_item_key)
+
+if redis.call("GET", first_item_key) == false then
+    redis.call("SET", first_item_key, given_item_key)
+end
+'''.strip()
 
 pop_lua_script = '''
 local first_item_key = KEYS[1]
@@ -53,6 +69,7 @@ redis.call("LPUSH", active_items_key, dictionary_key)
 redis.call("HMSET", dictionary_key, "status", "active", "ack_timeout", ack_timeout, "last_ack", timestamp)
 redis.call("LREM", idle_items_key, 0, dictionary_key)
 redis.call("SET", first_item_key, next_key)
+
 return redis.call("HGETALL", dictionary_key)
 '''.strip()
 
@@ -70,7 +87,9 @@ class JSONRedisBackend(BaseBackend):
             password=conf.path,
         )
         self.lua_pop = self.redis.register_script(pop_lua_script)
+        self.lua_put = self.redis.register_script(put_lua_script)
 
+    @io_operation
     def serialize(self, value):
         return json.dumps(value)
 
@@ -137,20 +156,23 @@ class JSONRedisBackend(BaseBackend):
         product = self.serialize(item)
         uuid = hashlib.sha1(product).hexdigest()
         key_prefix = ':'.join(['lineup', 'queue', queue_name])
-        dictionary_key = ':'.join([key_prefix, uuid])
         first_item_key = ':'.join([key_prefix, 'first'])
         idle_items_key = ':'.join([key_prefix, 'idle-items'])
+        given_item_key = ':'.join([key_prefix, uuid])
 
-        pipe = self.redis.pipeline()
-        pipe.hmset(dictionary_key, {
-            'data': product,
-            'status': 'idle',
-            'uuid': uuid
-        })
-        pipe.setnx(first_item_key, dictionary_key)
-        pipe.lpush(idle_items_key, dictionary_key)
-        pipe.execute()
-        return dictionary_key
+        self.lua_put(
+            keys=[
+                first_item_key,
+                idle_items_key,
+                given_item_key,
+            ],
+            args=[
+                uuid,
+                product,
+            ]
+        )
+
+        return given_item_key
 
     def pop(self, queue_name, owner, ack_timeout, wait=True):
         key_prefix = ':'.join(['lineup', 'queue', queue_name])
