@@ -3,8 +3,10 @@
 from __future__ import unicode_literals
 import sys
 import os
+import time
 import socket
 import signal
+from threading import Thread
 from lineup.datastructures import Queue
 from lineup.core import PipelineRegistry
 
@@ -54,6 +56,8 @@ class Node(object):
         if self.__started:
             return
 
+        self.heartbeat.start()
+
         for worker in self.workers:
             worker.start()
 
@@ -66,6 +70,7 @@ class Node(object):
         for child in self.workers:
             child.stop()
 
+        self.heartbeat.stop()
         self.__started = False
 
     @property
@@ -85,6 +90,7 @@ class Pipeline(Node):
         self.queues = self.get_queues(*args, **kwargs)
         isteps = enumerate(self.steps)
         self.workers = [self.make_worker(Type, i) for i, Type in isteps]
+        self.heartbeat = HeartBeatMonitor(self.queues)
 
     @property
     def input(self):
@@ -117,3 +123,22 @@ class Pipeline(Node):
         previous = self.queues[index]
         following = self.queues[index + 1]
         return Worker(previous, following, self)
+
+
+class HeartBeatMonitor(Thread):
+    def __init__(self, queues, backend_class, interval=1):
+        self.queue_names = [q.name for q in queues]
+        self.interval = interval
+        self.backend = backend_class()
+
+    def stop(self):
+        self.in_use.release()
+
+    def run(self):
+        self.in_use.acquire()
+
+        while self.in_use.locked():
+            for name in self.queue_names:
+                self.backend.heartbeat(name)
+
+            time.sleep(1)
