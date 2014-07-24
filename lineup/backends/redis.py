@@ -25,16 +25,36 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import unicode_literals, absolute_import
+import time
 import os
+import hashlib
 import json
+from itertools import izip
 from milieu import Environment
 
-from lineup.backends.base import BaseBackend, io_operation
+from lineup.backends.base import BaseBackend
 
 from redis import StrictRedis
 
 env = Environment()
 os.environ.setdefault('LINEUP_REDIS_URI', 'redis://0@localhost:6379')
+
+pop_lua_script = '''
+local first_item_key = KEYS[1]
+local active_items_key = KEYS[2]
+local idle_items_key = KEYS[3]
+
+local ack_timeout = ARGV[1]
+local timestamp = ARGV[2]
+
+local next_key = redis.call("LINDEX", idle_items_key, -2)
+local dictionary_key = redis.call("GET", first_item_key)
+redis.call("LPUSH", active_items_key, dictionary_key)
+redis.call("HMSET", dictionary_key, "status", "active", "ack_timeout", ack_timeout, "last_ack", timestamp)
+redis.call("LREM", idle_items_key, 0, dictionary_key)
+redis.call("SET", first_item_key, next_key)
+return redis.call("HGETALL", dictionary_key)
+'''.strip()
 
 
 class JSONRedisBackend(BaseBackend):
@@ -49,6 +69,7 @@ class JSONRedisBackend(BaseBackend):
             # redis://dbindex@hostname:port/veryverylongpasswordhash
             password=conf.path,
         )
+        self.lua_pop = self.redis.register_script(pop_lua_script)
 
     def serialize(self, value):
         return json.dumps(value)
@@ -57,50 +78,41 @@ class JSONRedisBackend(BaseBackend):
         return value and json.loads(value) or None
 
     # read operations
-    @io_operation
     def get(self, key):
         value = self.redis.get(key)
         result = self.deserialize(value)
         return result
 
-    @io_operation
     def lpop(self, key):
         value = self.redis.lpop(key)
         result = self.deserialize(value)
         return result
 
-    @io_operation
     def llen(self, key):
         return self.redis.llen(key)
 
-    @io_operation
     def lrange(self, key, start, stop):
         return map(self.deserialize, self.redis.lrange(key, start, stop))
 
-    @io_operation
     def rpop(self, key):
         value = self.redis.rpop(key)
         result = self.deserialize(value)
         return result
 
     # Write operations
-    @io_operation
     def set(self, key, value):
         product = self.serialize(value)
         return self.redis.set(key, product)
 
-    @io_operation
     def rpush(self, key, value):
         product = self.serialize(value)
         return self.redis.rpush(key, product)
 
-    @io_operation
     def lpush(self, key, value):
         product = self.serialize(value)
         return self.redis.lpush(key, product)
 
     # Pipeline operations
-    @io_operation
     def report_steps(self, name, consumers, producers):
         pipeline = self.redis.pipeline()
         producers_key = ':'.join([name, 'producers'])
@@ -120,3 +132,43 @@ class JSONRedisBackend(BaseBackend):
         all_producers = result[-1]
 
         return all_consumers, all_producers
+
+    def put(self, queue_name, item):
+        product = self.serialize(item)
+        uuid = hashlib.sha1(product).hexdigest()
+        key_prefix = ':'.join(['lineup', 'queue', queue_name])
+        dictionary_key = ':'.join([key_prefix, uuid])
+        first_item_key = ':'.join([key_prefix, 'first'])
+        idle_items_key = ':'.join([key_prefix, 'idle-items'])
+
+        pipe = self.redis.pipeline()
+        pipe.hmset(dictionary_key, {
+            'data': product,
+            'status': 'idle',
+            'uuid': uuid
+        })
+        pipe.setnx(first_item_key, dictionary_key)
+        pipe.lpush(idle_items_key, dictionary_key)
+        pipe.execute()
+        return dictionary_key
+
+    def pop(self, queue_name, owner, ack_timeout, wait=True):
+        key_prefix = ':'.join(['lineup', 'queue', queue_name])
+        idle_items_key = ':'.join([key_prefix, 'idle-items'])
+        active_items_key = ':'.join([key_prefix, 'active-items'])
+        first_item_key = ':'.join([key_prefix, 'first'])
+
+        redis_data = self.lua_pop(
+            keys=[
+                first_item_key,
+                active_items_key,
+                idle_items_key,
+            ],
+            args=[
+                ack_timeout,
+                time.time()
+            ]
+        )
+        i = iter(redis_data)
+        data = dict(izip(i, i))
+        return data
