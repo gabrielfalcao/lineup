@@ -47,7 +47,7 @@ local given_item_key = KEYS[3]
 local uuid = ARGV[1]
 local data = ARGV[2]
 
-redis.call("HMSET", given_item_key, "uuid", uuid, "data", data, "status", "idle")
+redis.call("HMSET", given_item_key, "uuid", uuid, "data", data, "status", "idle", "key", given_item_key)
 redis.call("LPUSH", idle_items_key, given_item_key)
 
 if redis.call("GET", first_item_key) == false then
@@ -73,6 +73,33 @@ redis.call("SET", first_item_key, next_key)
 return redis.call("HGETALL", dictionary_key)
 '''.strip()
 
+update_ack_lua_script = '''
+local item_key = KEYS[1]
+local timestamp = ARGV[1]
+
+redis.call("HMSET", item_key, "last_ack", timestamp)
+return redis.call("HGETALL", item_key)
+'''.strip()
+
+queue_heartbeat_lua_script = '''
+local idle_items_key = KEYS[1]
+local active_items_key = KEYS[2]
+local first_item_key = KEYS[3]
+
+local timestamp = tonumber(ARGV[1])
+
+local active_items = redis.call("LRANGE", active_items_key, 0, -1)
+for k, item_key in pairs(active_items) do
+    local last_ack = tonumber(redis.call("HGET", item_key, "last_ack"))
+    local ack_timeout = tonumber(redis.call("HGET", item_key, "ack_timeout"))
+    if (timestamp - last_ack) > ack_timeout then
+        redis.call("HSET", item_key, "status", "idle")
+        redis.call("LREM", active_items_key, 0, item_key)
+        redis.call("LPUSH", idle_items_key, item_key)
+    end
+end
+'''.strip()
+
 
 class JSONRedisBackend(BaseBackend):
     def initialize(self):
@@ -88,6 +115,8 @@ class JSONRedisBackend(BaseBackend):
         )
         self.lua_pop = self.redis.register_script(pop_lua_script)
         self.lua_put = self.redis.register_script(put_lua_script)
+        self.lua_update_ack = self.redis.register_script(update_ack_lua_script)
+        self.lua_heartbeat = self.redis.register_script(queue_heartbeat_lua_script)
 
     @io_operation
     def serialize(self, value):
@@ -174,23 +203,47 @@ class JSONRedisBackend(BaseBackend):
 
         return given_item_key
 
-    def pop(self, queue_name, owner, ack_timeout, wait=True):
+    def pop(self, queue_name, owner, ack_timeout):
         key_prefix = ':'.join(['lineup', 'queue', queue_name])
         idle_items_key = ':'.join([key_prefix, 'idle-items'])
         active_items_key = ':'.join([key_prefix, 'active-items'])
         first_item_key = ':'.join([key_prefix, 'first'])
 
-        redis_data = self.lua_pop(
-            keys=[
-                first_item_key,
-                active_items_key,
-                idle_items_key,
-            ],
-            args=[
-                ack_timeout,
-                time.time()
-            ]
-        )
+        redis_data = None
+        while not redis_data:
+            redis_data = self.lua_pop(
+                keys=[
+                    first_item_key,
+                    active_items_key,
+                    idle_items_key,
+                ],
+                args=[
+                    ack_timeout,
+                    time.time()
+                ]
+            )
+
+        data = self.list_to_dictionary(redis_data)
+        return data
+
+    def ack_activity(self, item_key):
+        redis_data = self.lua_update_ack(keys=[item_key], args=[time.time()])
+        data = self.list_to_dictionary(redis_data)
+        return data
+
+    def heartbeat(self, queue_name):
+        key_prefix = ':'.join(['lineup', 'queue', queue_name])
+        idle_items_key = ':'.join([key_prefix, 'idle-items'])
+        active_items_key = ':'.join([key_prefix, 'active-items'])
+        first_item_key = ':'.join([key_prefix, 'first'])
+
+        self.lua_heartbeat(keys=[
+            idle_items_key,
+            active_items_key,
+            first_item_key,
+        ], args=[time.time()])
+
+    def list_to_dictionary(self, redis_data):
         i = iter(redis_data)
         data = dict(izip(i, i))
         return data

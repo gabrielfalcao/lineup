@@ -131,7 +131,7 @@ def test_backend_pop(context):
     item2_key = backend.put("borrowees", {'sour': 'item 2'})
 
     # When I get an item
-    item = backend.pop('borrowees', owner='some-name', ack_timeout=10, wait=False)
+    item = backend.pop('borrowees', owner='some-name', ack_timeout=10)
 
     # Then the item should be the first one of the queue, because it's FIFO
     item.should.have.key('data').being.equal('{"sweet": "item 1"}')
@@ -153,3 +153,58 @@ def test_backend_pop(context):
 
     # And the 2nd item should be the first item in the queue
     context.redis.get('lineup:queue:borrowees:first').should.equal(item2_key)
+
+
+@redis_test
+def test_backend_ack(context):
+    ("JSONRedisBackend#ack_activity() should update the last_ack of the item")
+
+    # Given a backend instance
+    backend = JSONRedisBackend()
+
+    # And that there is an active item
+    item_key = backend.put("borrowees", {'sweet': 'item 1'})
+    old_item = backend.pop('borrowees', owner='some-name', ack_timeout=10)
+    old_ack = float(old_item.pop('last_ack'))
+
+    # When I update its ack
+    new_item = backend.ack_activity(item_key)
+    last_ack = float(new_item.pop('last_ack'))
+
+    # Then the ack should have been updated
+    last_ack.should.be.greater_than(old_ack)
+
+    # And all the other items should be the same
+    old_item.should.equal(new_item)
+
+
+@redis_test
+def test_backend_heartbeat(context):
+    ("JSONRedisBackend#heartbeat() should check for timed out items and put them back into the idle queue")
+
+    # Given a backend instance
+    backend = JSONRedisBackend()
+
+    # And that there is an active item with last_ack 0
+    item_key = backend.put("borrowees", {'sweet': 'item 1'})
+    backend.pop('borrowees', owner='some-name', ack_timeout=1)
+    context.redis.hset(item_key, 'last_ack', 0)
+
+    # And that the item is in the active list
+    context.redis.lrange(
+        'lineup:queue:borrowees:active-items', 0, -1).should.equal([item_key])
+
+    # And that the idle list is empty
+    context.redis.lrange(
+        'lineup:queue:borrowees:idle-items', 0, -1).should.be.empty
+
+    # When I call heartbeat()
+    backend.heartbeat('borrowees')
+
+    # Then the list of active items should be empty
+    # And it should be in the "active" list
+    context.redis.lrange(
+        'lineup:queue:borrowees:active-items', 0, -1).should.be.empty
+
+    context.redis.lrange(
+        'lineup:queue:borrowees:idle-items', 0, -1).should.equal([item_key])
