@@ -83,7 +83,7 @@ class Step(Thread):
     def after_consume(self, instructions):
         self.log("%s is done", self.name)
 
-    def do_rollback(self, instructions):
+    def do_rollback(self, instructions, meta):
         try:
             self.rollback(instructions)
 
@@ -99,10 +99,8 @@ class Step(Thread):
     def rollback(self, instructions):
         tb = sys.exc_info()[-1].tb_next.tb_next
         instructions['__lineup__error__'] = {'traceback': traceback.format_exc(tb)}
-        logger.error(
-            "The send data was lost: "
-            "\033[1;33m%s\033[0m", instructions,
-        )
+        self.consume_queue.put(instructions)
+        self.ready.clear()
 
     def stop(self):
         return self.ready.set()
@@ -139,14 +137,14 @@ class Step(Thread):
             self.rollback(instructions)
 
         except Exception as e:
-            self.handle_exception(e, instructions)
+            self.handle_exception(e, instructions, meta)
             logger.error("%s failed", self)
         finally:
             self.ready.clear()
 
         self.after_consume(instructions)
 
-    def handle_exception(self, e, instructions):
+    def handle_exception(self, e, instructions, meta):
         error = traceback.format_exc(e)
 
         instructions.update({
@@ -155,4 +153,4 @@ class Step(Thread):
             }
         })
 
-        self.do_rollback(instructions)
+        self.do_rollback(instructions, meta)

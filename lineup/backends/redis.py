@@ -66,6 +66,7 @@ local timestamp = ARGV[2]
 local next_key = redis.call("LINDEX", idle_items_key, -2)
 local dictionary_key = redis.call("GET", first_item_key)
 
+
 redis.call("LPUSH", active_items_key, dictionary_key)
 redis.call("HMSET", dictionary_key, "status", "active", "ack_timeout", ack_timeout, "last_ack", timestamp)
 redis.call("LREM", idle_items_key, 0, dictionary_key)

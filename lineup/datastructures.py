@@ -46,7 +46,7 @@ class Queue(object):
     def get(self, wait=False, owner=None, ack_timeout=10):
         done = self.backend.pop(self.name, owner, ack_timeout)
 
-        while wait and done is None:
-            done = self.backend.pop(self.name)
+        # while wait and done is None:
+        #     done = self.backend.pop(self.name)
 
         return done

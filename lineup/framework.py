@@ -4,12 +4,14 @@ from __future__ import unicode_literals
 import sys
 import os
 import json
-import time
 import socket
 import signal
-from threading import Thread, Lock
+import logging
+# from threading import Thread, Lock
 from lineup.datastructures import Queue
 from lineup.core import PipelineRegistry
+
+logger = logging.getLogger('lineup.framework')
 
 
 class Node(object):
@@ -107,7 +109,10 @@ class Pipeline(Node):
 
     def get_result(self, wait=True):
         result = self.output.get(wait=wait)
-        data = json.loads(result['data'])
+        if result:
+            data = json.loads(result['data'])
+        else:
+            logger.warning('%s.get returned falsy', self.output)
         return data
 
     def make_queue(self, index):

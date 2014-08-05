@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import json
 from lineup import Step
 from lineup.framework import Pipeline
 from lineup.backends.redis import JSONRedisBackend

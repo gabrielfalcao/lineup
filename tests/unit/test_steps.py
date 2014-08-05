@@ -342,8 +342,14 @@ def test_step_is_active(Event):
     step.is_active().should.be.true
 
 
-def test_step_rollback():
+@patch('lineup.steps.sys')
+@patch('lineup.steps.traceback')
+def test_step_rollback(traceback, sys):
     ("Step#rollback should call consume")
+    exc = Mock(name='exception')
+    exc.tb_next.tb_next = 'the traceback'
+    sys.exc_info.return_value = [exc]
+    traceback.format_exc.return_value = 'the full traceback'
 
     # Given a consumer queue
     consumer_queue = Mock(name='consumer_queue')
@@ -477,10 +483,12 @@ def test_step_loop_upon_exception():
 
 
 @patch('lineup.steps.logger')
-def test_step_loop_upon_lineup_key_error(logger):
+@patch('lineup.steps.traceback')
+def test_step_loop_upon_lineup_key_error(traceback, logger):
     ("Step#loop should log a LineUpKeyError gracefully "
      "showing the failed file and line number")
 
+    traceback.format_exc.return_value = 'the traceback'
     stack = []
 
     register = lambda name: lambda *args, **kw: stack.append(
@@ -499,14 +507,14 @@ def test_step_loop_upon_lineup_key_error(logger):
 
     MyStep.ready.clear = register('ready.clear()')
     step = MyStep()
-    MyStep.consume_queue.get.return_value = {'data': '"instructions"'}
+    MyStep.consume_queue.get.return_value = {'data': '{"instructions": "yeah"}'}
 
     step.loop()
 
-    MyStep.do_consume.assert_called_once_with('instructions')
+    MyStep.do_consume.assert_called_once_with({u'__lineup__error__': {u'traceback': u'the traceback'}, u'instructions': u'yeah'})
     logger.error.assert_has_calls([
         call('LineUpKeyError:\n%s\n\033[1;33mIn file %s line %s\033[0m\n',
              exc,
              nopyc(mock.__file__), 958),
-        call(u'The send data was lost: \033[1;33m%s\033[0m', u'instructions'),
+        call(u'The send data was lost: \033[1;33m%s\033[0m', {u'__lineup__error__': {u'traceback': u'the traceback'}, u'instructions': u'yeah'})
     ])
