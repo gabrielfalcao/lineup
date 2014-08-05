@@ -3,7 +3,7 @@
 #
 from __future__ import unicode_literals
 
-from lineup.steps import KeyMaker
+from lineup.steps import KeyMaker, Step
 
 
 class FakeStep(object):

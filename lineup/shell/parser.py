@@ -22,7 +22,7 @@ from lineup.shell.commands import (
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Curdles your cheesy code and extracts its binaries')
+        description='Distributed Pipeline Framework for python')
 
     parser.add_argument(
         '-t', '--threads',
@@ -49,7 +49,15 @@ def main():
     )
 
     parser.add_argument(
-        'pipeline_name',
+        '-f', '--file',
+        metavar='PIPELINE_FILE',
+        type=str,
+        nargs=1,
+        help='path to the python file containing the pipeline',
+    )
+
+    parser.add_argument(
+        '-p', '--pipeline',
         metavar='PIPELINE_NAME',
         type=str,
         nargs=1,

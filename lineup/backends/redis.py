@@ -72,7 +72,7 @@ redis.call("LREM", idle_items_key, 0, dictionary_key)
 redis.call("SET", first_item_key, next_key)
 
 if dictionary_key == false then
-    return dictionary_key
+    return ""
 else
     return redis.call("HGETALL", dictionary_key)
 end

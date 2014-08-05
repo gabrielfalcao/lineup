@@ -97,6 +97,8 @@ class Step(Thread):
             self.produce_queue.put(instructions)
 
     def rollback(self, instructions):
+        tb = sys.exc_info()[-1].tb_next.tb_next
+        instructions['__lineup__error__'] = {'traceback': traceback.format_exc(tb)}
         logger.error(
             "The send data was lost: "
             "\033[1;33m%s\033[0m", instructions,
@@ -129,8 +131,6 @@ class Step(Thread):
 
         meta = self.consume_queue.get(wait=True, owner=self.id)
         instructions = json.loads(meta['data'])
-        if '__lineup__error__' in instructions:
-            self.stop()
         try:
             self.do_consume(instructions)
         except LineUpKeyError as e:

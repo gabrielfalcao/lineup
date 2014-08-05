@@ -132,21 +132,21 @@ class Pipeline(Node):
         return Worker(previous, following, self)
 
 
-class HeartBeatMonitor(Thread):
-    def __init__(self, queues, backend_class, interval=1):
-        self.queue_names = [q.name for q in queues]
-        self.interval = interval
-        self.backend = backend_class()
-        self.in_use = Lock()
-        self.in_use.acquire()
-        super(HeartBeatMonitor, self).__init__()
+# class HeartBeatMonitor(Thread):
+#     def __init__(self, queues, backend_class, interval=1):
+#         self.queue_names = [q.name for q in queues]
+#         self.interval = interval
+#         self.backend = backend_class()
+#         self.in_use = Lock()
+#         self.in_use.acquire()
+#         super(HeartBeatMonitor, self).__init__()
 
-    def stop(self):
-        self.in_use.release()
+#     def stop(self):
+#         self.in_use.release()
 
-    def run(self):
-        while self.in_use.locked():
-            for name in self.queue_names:
-                self.backend.heartbeat(name)
+#     def run(self):
+#         while self.in_use.locked():
+#             for name in self.queue_names:
+#                 self.backend.heartbeat(name)
 
-            time.sleep(1)
+#             time.sleep(1)

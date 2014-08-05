@@ -146,30 +146,30 @@ def test_pipeline_exception_key_error(context):
             u'awesome': True, u'foo': u'Bar'}, u'status': u"it's all good"})
 
 
-# @redis_test
-# def test_pipeline_default_rollback(context):
-#     ("Step has a default rollback")
+@redis_test
+def test_pipeline_default_rollback(context):
+    ("Step has a default rollback")
 
-#     class BoomStep(Step):
-#         def consume(self, instructions):
-#             if instructions['failpurposedly']:
-#                 raise ValueError("BOOM")
+    class BoomStep(Step):
+        def consume(self, instructions):
+            if instructions['failpurposedly']:
+                raise ValueError("BOOM")
 
-#             self.produce({'ok': True})
+            self.produce({'ok': True})
 
-#     class CoolFooBar(Pipeline):
-#         name = 'coolfoobar2'
-#         steps = [BoomStep]
+    class CoolFooBar(Pipeline):
+        name = 'coolfoobar2'
+        steps = [BoomStep]
 
-#     manager = CoolFooBar(JSONRedisBackend)
-#     manager.run_daemon()
-#     manager.run_daemon()
-#     manager.feed({'failpurposedly': True})
-#     manager.feed({'failpurposedly': False})
+    manager = CoolFooBar(JSONRedisBackend)
+    manager.run_daemon()
+    manager.run_daemon()
+    manager.feed({'failpurposedly': True})
+    manager.feed({'failpurposedly': False})
 
-#     result = manager.get_result()
-#     manager.stop()
+    result = manager.get_result()
+    manager.stop()
 
-#     result.should.equal({
-#         'ok': True,
-#     })
+    result.should.equal({
+        'ok': True,
+    })
