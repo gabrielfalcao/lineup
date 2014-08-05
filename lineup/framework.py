@@ -3,10 +3,11 @@
 from __future__ import unicode_literals
 import sys
 import os
+import json
 import time
 import socket
 import signal
-from threading import Thread
+from threading import Thread, Lock
 from lineup.datastructures import Queue
 from lineup.core import PipelineRegistry
 
@@ -20,6 +21,7 @@ class Node(object):
         signal.signal(signal.SIGINT, self.handle_control_c)
         self.__started = False
         self.initialize(*args, **kw)
+        # self.heartbeat = None
 
     def get_backend(self, *args, **kwargs):
         return self.backend_class(*args, **kwargs)
@@ -56,7 +58,8 @@ class Node(object):
         if self.__started:
             return
 
-        self.heartbeat.start()
+        # if self.heartbeat:
+        #     self.heartbeat.start()
 
         for worker in self.workers:
             worker.start()
@@ -70,7 +73,9 @@ class Node(object):
         for child in self.workers:
             child.stop()
 
-        self.heartbeat.stop()
+        # if self.heartbeat:
+        #     self.heartbeat.stop()
+
         self.__started = False
 
     @property
@@ -90,7 +95,7 @@ class Pipeline(Node):
         self.queues = self.get_queues(*args, **kwargs)
         isteps = enumerate(self.steps)
         self.workers = [self.make_worker(Type, i) for i, Type in isteps]
-        self.heartbeat = HeartBeatMonitor(self.queues)
+        # self.heartbeat = HeartBeatMonitor(self.queues, self.backend_class)
 
     @property
     def input(self):
@@ -100,8 +105,10 @@ class Pipeline(Node):
     def output(self):
         return self.queues[-1]
 
-    def get_result(self):
-        return self.output.get(wait=True)
+    def get_result(self, wait=True):
+        result = self.output.get(wait=wait)
+        data = json.loads(result['data'])
+        return data
 
     def make_queue(self, index):
         name = '.'.join([
@@ -130,13 +137,14 @@ class HeartBeatMonitor(Thread):
         self.queue_names = [q.name for q in queues]
         self.interval = interval
         self.backend = backend_class()
+        self.in_use = Lock()
+        self.in_use.acquire()
+        super(HeartBeatMonitor, self).__init__()
 
     def stop(self):
         self.in_use.release()
 
     def run(self):
-        self.in_use.acquire()
-
         while self.in_use.locked():
             for name in self.queue_names:
                 self.backend.heartbeat(name)

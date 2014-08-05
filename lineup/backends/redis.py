@@ -65,12 +65,17 @@ local timestamp = ARGV[2]
 
 local next_key = redis.call("LINDEX", idle_items_key, -2)
 local dictionary_key = redis.call("GET", first_item_key)
+
 redis.call("LPUSH", active_items_key, dictionary_key)
 redis.call("HMSET", dictionary_key, "status", "active", "ack_timeout", ack_timeout, "last_ack", timestamp)
 redis.call("LREM", idle_items_key, 0, dictionary_key)
 redis.call("SET", first_item_key, next_key)
 
-return redis.call("HGETALL", dictionary_key)
+if dictionary_key == false then
+    return dictionary_key
+else
+    return redis.call("HGETALL", dictionary_key)
+end
 '''.strip()
 
 update_ack_lua_script = '''
@@ -125,63 +130,8 @@ class JSONRedisBackend(BaseBackend):
     def deserialize(self, value):
         return value and json.loads(value) or None
 
-    # read operations
-    def get(self, key):
-        value = self.redis.get(key)
-        result = self.deserialize(value)
-        return result
-
-    def lpop(self, key):
-        value = self.redis.lpop(key)
-        result = self.deserialize(value)
-        return result
-
-    def llen(self, key):
-        return self.redis.llen(key)
-
-    def lrange(self, key, start, stop):
-        return map(self.deserialize, self.redis.lrange(key, start, stop))
-
-    def rpop(self, key):
-        value = self.redis.rpop(key)
-        result = self.deserialize(value)
-        return result
-
-    # Write operations
-    def set(self, key, value):
-        product = self.serialize(value)
-        return self.redis.set(key, product)
-
-    def rpush(self, key, value):
-        product = self.serialize(value)
-        return self.redis.rpush(key, product)
-
-    def lpush(self, key, value):
-        product = self.serialize(value)
-        return self.redis.lpush(key, product)
-
-    # Pipeline operations
-    def report_steps(self, name, consumers, producers):
-        pipeline = self.redis.pipeline()
-        producers_key = ':'.join([name, 'producers'])
-        consumers_key = ':'.join([name, 'consumers'])
-
-        for consumer in consumers:
-            pipeline.sadd(consumers_key, consumer)
-
-        for producer in producers:
-            pipeline.sadd(producers_key, producer)
-
-        pipeline.smembers(consumers_key)
-        pipeline.smembers(producers_key)
-
-        result = pipeline.execute()
-        all_consumers = result[-2]
-        all_producers = result[-1]
-
-        return all_consumers, all_producers
-
     def put(self, queue_name, item):
+        self.heartbeat(queue_name)
         product = self.serialize(item)
         uuid = hashlib.sha1(product).hexdigest()
         key_prefix = ':'.join(['lineup', 'queue', queue_name])
@@ -204,6 +154,7 @@ class JSONRedisBackend(BaseBackend):
         return given_item_key
 
     def pop(self, queue_name, owner, ack_timeout):
+        self.heartbeat(queue_name)
         key_prefix = ':'.join(['lineup', 'queue', queue_name])
         idle_items_key = ':'.join([key_prefix, 'idle-items'])
         active_items_key = ':'.join([key_prefix, 'active-items'])
@@ -247,3 +198,15 @@ class JSONRedisBackend(BaseBackend):
         i = iter(redis_data)
         data = dict(izip(i, i))
         return data
+
+    def get_stats(self, queue_name):
+        key_prefix = ':'.join(['lineup', 'queue', queue_name])
+        idle_items_key = ':'.join([key_prefix, 'idle-items'])
+        active_items_key = ':'.join([key_prefix, 'active-items'])
+
+        idle = self.redis.llen(idle_items_key)
+        active = self.redis.llen(active_items_key)
+        return {
+            'idle': idle,
+            'active': active,
+        }

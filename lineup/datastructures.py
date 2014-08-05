@@ -35,34 +35,18 @@ class Queue(object):
         self.maxsize = maxsize
         self.timeout = timeout
         self.backend = backend_class()
-        self.producers = set()
-        self.consumers = set()
 
     def __repr__(self):
         return b'<lineup.Queue({0}, backend={1})>'.format(
             self.name, self.backend)
 
-    def adopt_producer(self, producer):
-        self.producers.add(producer.id)
-        return self.report()
-
-    def report(self):
-        return self.backend.report_steps(
-            self.name, self.consumers, self.producers)
-
-    def adopt_consumer(self, consumer):
-        self.consumers.add(consumer.id)
-        return self.report()
-
     def put(self, payload):
-        self.backend.rpush(self.name, payload)
+        self.backend.put(self.name, payload)
 
-    def get(self, wait=False):
-        done = self.backend.lpop(self.name)
+    def get(self, wait=False, owner=None, ack_timeout=10):
+        done = self.backend.pop(self.name, owner, ack_timeout)
+
         while wait and done is None:
-            done = self.backend.lpop(self.name)
+            done = self.backend.pop(self.name)
 
         return done
-
-    def get_size(self):
-        return self.backend.llen(self.name)

@@ -13,6 +13,10 @@ nopyc = lambda x:re.sub(r'py[cao]$', 'py', x)
 
 class TestStep(Step):
     def __init__(self):
+        self.parent = Mock(name='MyStep.parent')
+        self.parent.get_name.return_value = 'MyStepParent1'
+        self.parent.id = 'parentid'
+        # calling Thread.__init__()
         super(Step, self).__init__()
 
     def __repr__(self):
@@ -57,9 +61,6 @@ def test_step_manages_to_get_adopted(logging, KeyMaker, Event):
     manager = Mock(name='manager')
 
     step = Step(consumer, producer, manager)
-
-    consumer.adopt_consumer.assert_called_once_with(step)
-    producer.adopt_producer.assert_called_once_with(step)
 
     step.ready.should.equal(Event.return_value)
     step.key.should.equal(KeyMaker.return_value)
@@ -119,21 +120,18 @@ def test_step_as_id():
 
 
 @patch("lineup.steps.KeyMaker")
-@patch("lineup.steps.time")
 @patch("lineup.steps.logging")
-def test_step_log(logging, time, KeyMaker):
+def test_step_log(logging, KeyMaker):
     ("Step#log should log as INFO and push to a redis list")
 
     KeyMaker.return_value.logging = 'step_key_for_logging'
 
-    time.time.return_value = 'CLOCK'
     # Given a consumer queue
     consumer = Mock(name='consumer_queue')
     # And a producer queue
     producer = Mock(name='producer_queue')
     # And a manager
     parent = Mock(name='parent')
-    backend = parent.get_backend.return_value
 
     class FooStep(Step):
         def consume(self, instructions):
@@ -141,11 +139,6 @@ def test_step_log(logging, time, KeyMaker):
 
     step = FooStep(consumer, producer, parent)
     step.log("Mensagem %s", "arg1")
-    backend.rpush.assert_called_once_with(
-        'step_key_for_logging', {
-            'message': 'Mensagem arg1',
-            'when': 'CLOCK'
-        })
 
 
 def test_step_do_consume():
@@ -274,13 +267,14 @@ def test_step_do_rollback():
 
 
 @patch('lineup.steps.logger')
+@patch('lineup.steps.traceback')
 @patch('lineup.steps.sys.exc_info')
 @patch('lineup.steps.Step.log_key_error')
 def test_step_do_rollback_failed_exception(
-        log_key_error, exc_info, logger):
+        log_key_error, exc_info, traceback, logger):
     ("Step#do_rollback should handle LineUpKeyError")
 
-    traceback = Mock(name='traceback')
+    traceback.format_exc.return_value = 'yay'
     exc_info.return_value = [traceback]
 
     # Given a consumer queue
@@ -307,11 +301,9 @@ def test_step_do_rollback_failed_exception(
     logger.exception.assert_called_once_with(
         'Failed to rollback %s:\n\n%s\n',
         b'tests.unit.test_steps.CoolStep',
-        {'instructions': True})
+        {'instructions': True, '__lineup__error__': {'traceback': 'yay'}})
 
-    CoolStep.produce.assert_called_once_with({
-        'instructions': True,
-    })
+    CoolStep.produce.called.should.be.false
 
 
 @patch("lineup.steps.Event")
@@ -431,9 +423,10 @@ def test_step_loop():
         do_consume = Mock(name='MyStep.do_consume')
         ready = Mock(name='MyStep.ready')
 
+
     MyStep.ready.clear = register('ready.clear()')
     step = MyStep()
-    MyStep.consume_queue.get.return_value = 'instructions'
+    MyStep.consume_queue.get.return_value = {'data': '"instructions"'}
 
     step.loop()
 
@@ -468,7 +461,7 @@ def test_step_loop_upon_exception():
 
     MyStep.ready.clear = register('ready.clear()')
     step = MyStep()
-    MyStep.consume_queue.get.return_value = 'instructions'
+    MyStep.consume_queue.get.return_value = {'data': '"instructions"'}
 
     step.loop()
 
@@ -496,7 +489,6 @@ def test_step_loop_upon_lineup_key_error(logger):
     class MyStep(TestStep):
         before_consume = register('before_consume')
         after_consume = register('after_consume')
-
         ready = Mock(name='MyStep.ready')
         consume_queue = Mock(name='consume_queue')
         do_consume = Mock(name='MyStep.do_consume')
@@ -507,7 +499,7 @@ def test_step_loop_upon_lineup_key_error(logger):
 
     MyStep.ready.clear = register('ready.clear()')
     step = MyStep()
-    MyStep.consume_queue.get.return_value = 'instructions'
+    MyStep.consume_queue.get.return_value = {'data': '"instructions"'}
 
     step.loop()
 

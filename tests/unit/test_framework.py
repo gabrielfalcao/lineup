@@ -172,6 +172,10 @@ def test_node_is_running():
 
 def test_pipeline_initialize():
     ("Pipeline#initialize should create queues and workers")
+    queue1 = Mock(name='queue1')
+    queue1.name = 'queue1'
+    queue2 = Mock(name='queue2')
+    queue2.name = 'queue2'
 
     # Given a fake backend
     backend = Mock(name='backend')
@@ -184,6 +188,7 @@ def test_pipeline_initialize():
         make_worker = Mock(name='MyPipe.make_worker')
         steps = ['step1', 'step2']
 
+    MyPipe.get_queues.return_value = [queue1, queue2]
     MyPipe.make_worker.side_effect = lambda Klass, index: {
         'worker': index,
         'class': Klass,
@@ -212,6 +217,7 @@ def test_pipeline_input():
 
     class MyPipe(Pipeline):
         name = 'mypipe2'
+
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -231,6 +237,7 @@ def test_pipeline_output():
 
     class MyPipe(Pipeline):
         name = 'mypipe3'
+
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -248,8 +255,11 @@ def test_pipeline_get_result():
     q1 = Mock(name='Queue(1)')
     q2 = Mock(name='Queue(2)')
 
+    q2.get.return_value = {'data': '{"json": true}'}
+
     class MyPipe(Pipeline):
         name = 'mypipe4'
+
         def __init__(self):
             self.queues = [q1, q2]
 
@@ -257,7 +267,7 @@ def test_pipeline_get_result():
     pipe = MyPipe()
 
     # And call get_result from the output queue
-    pipe.get_result().should.equal(q2.get.return_value)
+    pipe.get_result().should.equal({'json': True})
 
     # And the call should have waited
     q2.get.assert_called_once_with(wait=True)
@@ -328,6 +338,7 @@ def test_pipeline_make_worker():
 
     class MyPipe(Pipeline):
         name = 'mypipe6'
+
         def __init__(self):
             self.queues = [q1, q2, q3, q4, q5, q6]
 

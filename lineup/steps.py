@@ -4,7 +4,7 @@
 from __future__ import unicode_literals
 import re
 import sys
-import time
+import json
 import logging
 import traceback
 
@@ -25,7 +25,9 @@ class KeyMaker(object):
 
 
 class Step(Thread):
-    # TODO: use AST to make sure that the subclasses are
+    # TODO: use AST to make sure that the subclasses are calling
+    # produce() within the consume method implementation
+
     def __init__(self, consume_queue, produce_queue, parent):
         self.parent = parent
         self.consume_queue = consume_queue
@@ -41,9 +43,6 @@ class Step(Thread):
         self.key = KeyMaker(self)
         self.name = getattr(self.__class__,
                             'label', self.taxonomy)
-
-        consume_queue.adopt_consumer(self)
-        produce_queue.adopt_producer(self)
 
     def get_name(self):
         return getattr(self, 'name', None) or self.taxonomy
@@ -67,10 +66,6 @@ class Step(Thread):
 
     def log(self, message, *args, **kw):
         logger.info(message, *args, **kw)
-        return self.backend.rpush(self.key.logging, {
-            'message': message % args % kw,
-            'when': time.time()
-        })
 
     def do_consume(self, instructions):
         # safe_instructions is a dictionary wrapped in a
@@ -92,13 +87,14 @@ class Step(Thread):
         try:
             self.rollback(instructions)
 
-        except Exception:
-            self.produce(instructions)
+        except Exception as e:
             logger.exception(
                 "Failed to rollback %s:\n\n%s\n",
                 self.name,
                 instructions,
             )
+            instructions['__lineup__error__'] = {'traceback': traceback.format_exc(e)}
+            self.produce_queue.put(instructions)
 
     def rollback(self, instructions):
         logger.error(
@@ -131,8 +127,10 @@ class Step(Thread):
     def loop(self):
         self.before_consume()
 
-        instructions = self.consume_queue.get(wait=True)
-
+        meta = self.consume_queue.get(wait=True, owner=self.id)
+        instructions = json.loads(meta['data'])
+        if '__lineup__error__' in instructions:
+            self.stop()
         try:
             self.do_consume(instructions)
         except LineUpKeyError as e:
@@ -142,7 +140,7 @@ class Step(Thread):
 
         except Exception as e:
             self.handle_exception(e, instructions)
-            logger.exception("%s failed", self)
+            logger.error("%s failed", self)
         finally:
             self.ready.clear()
 
@@ -154,8 +152,6 @@ class Step(Thread):
         instructions.update({
             '__lineup__error__': {
                 'traceback': error,
-                'consume_queue_size': self.consume_queue.get_size(),
-                'produce_queue_size': self.produce_queue.get_size(),
             }
         })
 
