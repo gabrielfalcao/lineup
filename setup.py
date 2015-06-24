@@ -69,7 +69,7 @@ def parse_requirements(path):
             name, version = re.findall("\#egg=([^\-]+)-(.+$)", req)[0]
             pkgs.append('{0}=={1}'.format(name, version))
         else:
-            pkgs.append(req)
+            pkgs.append(req.replace('==', '>='))
 
     return pkgs, links
 
