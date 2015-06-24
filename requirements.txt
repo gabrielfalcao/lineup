@@ -1,4 +1,4 @@
-coloredlogs==0.4.7
-redis==2.8.0
-milieu==0.1.5
+coloredlogs==1.0.1
+milieu==0.1.7
 plant==0.1.1
+redis==2.10.3
