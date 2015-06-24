@@ -10,7 +10,7 @@ import zmq
 def producer():
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUSH)
-    zmq_socket.bind("tcp://127.0.0.1.6557")
+    zmq_socket.bind("tcp://127.0.0.1.7557")
     # Start your result manager and workers before you start your producers
     for num in xrange(1000000):
         work_message = {
