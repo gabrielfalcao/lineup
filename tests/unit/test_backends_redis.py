@@ -48,7 +48,7 @@ def test_serialize(json):
     result.should.equal(json.dumps.return_value)
 
     # And json.dumps should have been called appropriately
-    json.dumps.assert_called_once_with({"foo": "bar"})
+    json.dumps.assert_called_once_with({"foo": "bar"}, default=bytes)
 
 
 

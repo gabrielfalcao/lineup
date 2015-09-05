@@ -51,7 +51,7 @@ class JSONRedisBackend(BaseBackend):
         )
 
     def serialize(self, value):
-        return json.dumps(value)
+        return json.dumps(value, default=bytes)
 
     def deserialize(self, value):
         return value and json.loads(value) or None
